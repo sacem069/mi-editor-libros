@@ -1,9 +1,15 @@
 import './Topbar.css'
+import Image from 'next/image'
 
 export default function Topbar() {
   return (
     <div className="topbar">
-      <span className="topbar-logo">Zeika's Builder</span>
+      <Image
+        src="/LogoZeika.png"
+        alt="Zeika"
+        width={36}
+        height={36}
+      />
 
       <div className="topbar-spacer" />
 

@@ -14,9 +14,9 @@
 }
 
 .topbar-logo {
-  font-family: serif;
+  font-family: 'amandine', serif;
   font-size: 18px;
-  color: #1C1A17;
+  color: var(--color-text);
 }
 
 .topbar-spacer {
