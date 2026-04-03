@@ -1,11 +1,11 @@
 .topbar {
-  height: 52px;
-  background: white;
-  border-bottom: 1px solid #E0DDD8;
+  height: 50px;
+  background: #fefefe;
+  border-bottom: 1px solid black;
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
+  padding: 0 15px;
+  gap: 16px;
   position: fixed;
   top: 0;
   left: 0;
@@ -13,36 +13,53 @@
   z-index: 100;
 }
 
-.topbar-logo {
-  font-family: 'amandine', serif;
-  font-size: 18px;
-  color: var(--color-text);
-}
-
 .topbar-spacer {
   flex: 1;
 }
 
-.topbar-btn {
-  padding: 6px 14px;
-  border-radius: 2px;
-  border: 1px solid #E0DDD8;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  color: #1C1A17;
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.topbar-btn:hover {
-  background: #F2F0EB;
+.topbar-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #282828;
+  padding: 4px 8px;
+}
+
+.topbar-action-btn span {
+  font-family: 'Overused Grotesk', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18px;
+  white-space: nowrap;
+  color: #282828;
+}
+
+.topbar-action-btn:hover {
+  opacity: 0.7;
 }
 
 .topbar-btn-primary {
   background: #528ED6;
   color: white;
   border: none;
+  border-radius: 1px;
+  padding: 8px 16px;
+  font-family: 'Overused Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .topbar-btn-primary:hover {
-  background: #528ED6;
+  opacity: 0.9;
 }

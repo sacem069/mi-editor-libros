@@ -1,5 +1,6 @@
 import './Topbar.css'
 import Image from 'next/image'
+import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
 
 export default function Topbar() {
   return (
@@ -7,15 +8,32 @@ export default function Topbar() {
       <Image
         src="/LogoZeika.png"
         alt="Zeika"
-        width={36}
-        height={36}
+        width={33}
+        height={33}
       />
 
       <div className="topbar-spacer" />
 
-      <button className="topbar-btn">Guardar</button>
-      <button className="topbar-btn">Previsualizar</button>
-      <button className="topbar-btn topbar-btn-primary">Revisar y comprar</button>
+      <div className="topbar-actions">
+        <button className="topbar-action-btn">
+          <Info size={18} strokeWidth={1.5} />
+          <span>Descripción</span>
+        </button>
+        <button className="topbar-action-btn">
+          <Share2 size={18} strokeWidth={1.5} />
+          <span>Compartir</span>
+        </button>
+        <button className="topbar-action-btn">
+          <ArrowDownToLine size={18} strokeWidth={1.5} />
+          <span>Guardar</span>
+        </button>
+        <button className="topbar-action-btn">
+          <Eye size={18} strokeWidth={1.5} />
+          <span>Previsualizar</span>
+        </button>
+      </div>
+
+      <button className="topbar-btn-primary">Revisar y comprar</button>
     </div>
   )
 }
