@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import * as fabric from 'fabric'
-import Topbar from '../components/Topbar'
+import Topbar from '../components/Topbar/Topbar'
 import Canvas from '../components/Canvas/Canvas'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
 import './editor.css'
