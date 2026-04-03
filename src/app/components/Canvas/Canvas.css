@@ -1,0 +1,157 @@
+/* ─── Wrapper — ocupa todo el espacio disponible entre los paneles ─────────── */
+
+.canvas-wrapper {
+  flex: 1;
+  overflow: auto;
+  background: #efefef;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 0 40px;
+}
+
+/* Reserva el espacio real que ocupa el spread escalado */
+.canvas-scale-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* El contenido a escalar — transformOrigin: top left */
+.canvas-spread-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* ─── Ruler ─────────────────────────────────────────────────────────────────── */
+
+.canvas-ruler-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.canvas-ruler-corner {
+  width: 22px;
+  height: 22px;
+  background: #d9d9d9;
+  flex-shrink: 0;
+}
+
+.canvas-ruler-h {
+  height: 22px;
+  background: #d9d9d9;
+  flex-shrink: 0;
+}
+
+.canvas-ruler-spine-gap {
+  /* matches the 1px spine */
+  width: 1px;
+  height: 22px;
+  background: #efefef;
+  flex-shrink: 0;
+}
+
+.canvas-pages-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.canvas-ruler-v {
+  width: 22px;
+  background: #d9d9d9;
+  flex-shrink: 0;
+}
+
+/* ─── Columna de página ─────────────────────────────────────────────────────── */
+
+.canvas-page-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.canvas-page-num {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 20px;
+  color: #515151;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  user-select: none;
+}
+
+.canvas-page-wrap {
+  position: relative;
+  border: 1px solid #000;
+  background: #ffffff;
+  line-height: 0; /* evita espacio extra debajo del canvas */
+}
+
+/* Bleed overlay — encima del canvas, pointer-events:none */
+.canvas-bleed-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* ─── Lomo / spine ──────────────────────────────────────────────────────────── */
+
+.canvas-spine {
+  width: 1px;
+  /* Se alinea con la altura de la página, no de la columna completa (que incluye el número) */
+  align-self: flex-end;
+  height: 1058px; /* PAGE_H — se sobreescribe en runtime pero evita flicker */
+  background: #000;
+  flex-shrink: 0;
+  margin-top: 32px; /* compensa el canvas-page-num height */
+}
+
+/* ─── Navegación ────────────────────────────────────────────────────────────── */
+
+.canvas-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 20px 0 0;
+}
+
+.canvas-nav-arrow {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--color-text);
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: opacity 0.15s;
+}
+
+.canvas-nav-arrow:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.canvas-nav-arrow:not(:disabled):hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.canvas-nav-label {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--color-text);
+  white-space: nowrap;
+  user-select: none;
+}
