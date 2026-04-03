@@ -5,7 +5,7 @@ export default function Home() {
     <div>
       <Topbar />
       <div style={{ textAlign: 'center', marginTop: '120px' }}>
-        <h1 style={{ 
+        <h1 style={{
           fontFamily: 'amandine, serif',
           fontSize: '64px',
           fontWeight: 400,
@@ -13,7 +13,7 @@ export default function Home() {
         }}>
           Zeika Memories
         </h1>
-        <p style={{ 
+        <p style={{
           fontFamily: 'OverusedGrotesk, sans-serif',
           fontSize: '18px',
           fontWeight: 400,
