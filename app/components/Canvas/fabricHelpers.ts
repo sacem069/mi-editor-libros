@@ -129,7 +129,7 @@ export async function dropPhotoOnFrame(
   })
   img.clipPath = clipRect
 
-  ;(img as FabricObjectWithData).data = {
+  ;(img as unknown as FabricObjectWithData).data = {
     type: 'frame',
     isEmpty: false,
     frameX,
@@ -337,7 +337,7 @@ export async function deserializePage(
       })
       img.clipPath = clipRect
 
-      ;(img as FabricObjectWithData).data = {
+      ;(img as unknown as FabricObjectWithData).data = {
         type: 'frame',
         isEmpty: false,
         frameX: sf.frameX,

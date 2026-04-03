@@ -1,0 +1,172 @@
+/* ─── Panel ──────────────────────────────────────────────────────────────────── */
+
+.photo-panel {
+  width: 220px;
+  flex-shrink: 0;
+  background: #fefefe;
+  border-right: 1px solid #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* altura calculada por el layout padre (editor page) */
+}
+
+/* ─── Acciones superiores ────────────────────────────────────────────────────── */
+
+.photo-panel-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  padding: 14px 8px 0;
+  gap: 4px;
+}
+
+.photo-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text);
+  padding: 4px 6px 6px;
+  border-radius: 2px;
+  min-width: 64px;
+}
+
+.photo-action-btn span {
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: #282828;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.photo-action-btn:hover {
+  background: var(--color-cream);
+}
+
+/* ─── File input oculto ──────────────────────────────────────────────────────── */
+
+.photo-file-input {
+  display: none;
+}
+
+/* ─── Auto-crear ─────────────────────────────────────────────────────────────── */
+
+.photo-panel-autocreate-row {
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px 0;
+}
+
+.photo-autocreate-btn {
+  background: #fcfcfc;
+  border: 1px solid #464646;
+  border-radius: 1px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  color: #282828;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.photo-autocreate-btn:hover {
+  background: var(--color-cream);
+}
+
+/* ─── Contador ───────────────────────────────────────────────────────────────── */
+
+.photo-panel-counter {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: #282828;
+  text-align: center;
+  padding: 10px 16px 0;
+}
+
+/* ─── Separator ──────────────────────────────────────────────────────────────── */
+
+.photo-panel-bar {
+  height: 3px;
+  background: var(--color-blue);
+  margin: 10px 16px 0;
+  border-radius: 0;
+}
+
+/* ─── Grid de fotos ──────────────────────────────────────────────────────────── */
+
+.photo-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 10px 10px 10px;
+  /* scrollbar delgada estilo Figma */
+  scrollbar-width: thin;
+  scrollbar-color: #a0a0a0 transparent;
+}
+
+.photo-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.photo-grid::-webkit-scrollbar-thumb {
+  background: #a0a0a0;
+  border-radius: 8px;
+}
+
+.photo-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ─── Miniatura ──────────────────────────────────────────────────────────────── */
+
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  cursor: grab;
+  border: 1.5px solid transparent;
+  border-radius: 1px;
+  background: #d9d9d9;
+  transition: border-color 0.12s;
+}
+
+.photo-thumb:hover {
+  border-color: var(--color-blue);
+}
+
+.photo-thumb:active {
+  cursor: grabbing;
+}
+
+.photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none; /* evita interferir con el drag */
+}
+
+/* ─── Checkmark de "foto usada" ──────────────────────────────────────────────── */
+
+.photo-thumb-used {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  background: #22c55e; /* green-500 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
