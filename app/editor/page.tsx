@@ -35,7 +35,7 @@ export default function EditorPage() {
 
   // ── Book / navigation ──────────────────────────────────────────────────────
   const [currentSpread,       setCurrentSpread]       = useState(0)
-  const [totalContentSpreads, setTotalContentSpreads] = useState(5)
+  const [totalContentSpreads, setTotalContentSpreads] = useState(13) // 13 spreads = 26 variable pages (02–27)
   const totalSpreads = totalContentSpreads + 3 // cover + inside + content + outside
 
   // ── Layout panel ───────────────────────────────────────────────────────────

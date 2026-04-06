@@ -10,14 +10,13 @@ const PAGE_W = BOOK_SIZE.widthPx   // 816
 const PAGE_H = BOOK_SIZE.heightPx  // 1058
 const BLEED  = BOOK_SIZE.bleedPx   // 11
 
-// Unscaled full spread dimensions (rulers + page nums + canvases + nav)
-const RULER    = 22
+// Unscaled full spread dimensions (page nums + canvases + nav, no rulers)
 const PAGE_NUM = 32
 const NAV      = 72
 const SPINE    = 1
 
-const SPREAD_W = RULER + PAGE_W + SPINE + PAGE_W   // 1655
-const SPREAD_H = RULER + PAGE_NUM + PAGE_H + NAV   // 1184
+const SPREAD_W = PAGE_W + SPINE + PAGE_W   // 1633
+const SPREAD_H = PAGE_NUM + PAGE_H + NAV   // 1162
 
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 2.0
@@ -88,17 +87,9 @@ export default function Canvas({
   useEffect(() => { onZoomChangeRef.current     = onZoomChange     }, [onZoomChange])
   useEffect(() => { zoomRef.current             = zoom             }, [zoom])
 
-  // ── Initial zoom: 80% fill (mount only, user wheel overrides after) ───────
+  // ── Initial zoom: hardcoded 49% ──────────────────────────────────────────
   useEffect(() => {
-    const el = outerRef.current
-    if (!el) return
-    const pad  = 80
-    const zoomW = (el.clientWidth  - pad) / SPREAD_W
-    const zoomH = (el.clientHeight - pad) / SPREAD_H
-    const initial = parseFloat(
-      Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(zoomW, zoomH) * 0.8)).toFixed(3)
-    )
-    onZoomChangeRef.current(initial)
+    onZoomChangeRef.current(0.49)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mouse wheel / pinch zoom ──────────────────────────────────────────────
@@ -192,17 +183,8 @@ export default function Canvas({
             className="canvas-spread-root"
             style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
           >
-            {/* Ruler row */}
-            <div className="canvas-ruler-row">
-              <div className="canvas-ruler-corner" />
-              <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
-              <div className="canvas-ruler-spine-gap" />
-              <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
-            </div>
-
             {/* Pages row */}
             <div className="canvas-pages-row">
-              <div className="canvas-ruler-v" style={{ height: PAGE_H }} />
 
               {/* Left page */}
               <div className="canvas-page-col">

@@ -35,44 +35,12 @@
   align-items: flex-start;
 }
 
-/* ─── Rulers ─────────────────────────────────────────────────────────────────── */
-
-.canvas-ruler-row {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-}
-
-.canvas-ruler-corner {
-  width: 22px;
-  height: 22px;
-  background: #d9d9d9;
-  flex-shrink: 0;
-}
-
-.canvas-ruler-h {
-  height: 22px;
-  background: #d9d9d9;
-  flex-shrink: 0;
-}
-
-.canvas-ruler-spine-gap {
-  width: 1px;
-  height: 22px;
-  background: #efefef;
-  flex-shrink: 0;
-}
+/* ─── Pages row ──────────────────────────────────────────────────────────────── */
 
 .canvas-pages-row {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-}
-
-.canvas-ruler-v {
-  width: 22px;
-  background: #d9d9d9;
-  flex-shrink: 0;
 }
 
 /* ─── Page column ────────────────────────────────────────────────────────────── */
@@ -114,10 +82,10 @@
 .canvas-spine {
   width: 1px;
   align-self: flex-end;
-  height: 1058px;
+  height: 1058px; /* PAGE_H */
   background: #000;
   flex-shrink: 0;
-  margin-top: 32px;
+  margin-top: 32px; /* matches canvas-page-num height */
 }
 
 /* ─── Navigation ─────────────────────────────────────────────────────────────── */
@@ -126,7 +94,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
   padding: 20px 0 0;
 }
@@ -136,9 +104,9 @@
   border: none;
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 14px;
+  font-size: 20px;
   color: var(--color-text);
-  padding: 4px 8px;
+  padding: 6px 12px;
   cursor: pointer;
   border-radius: 2px;
   transition: opacity 0.15s;
@@ -156,7 +124,7 @@
 .canvas-nav-label {
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 13px;
+  font-size: 18px;
   color: var(--color-text);
   white-space: nowrap;
   user-select: none;
