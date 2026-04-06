@@ -1,0 +1,103 @@
+/* ── Strip container ─────────────────────────────────────────────────────── */
+
+.page-strip {
+  height: 90px;
+  flex-shrink: 0;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-black);
+  overflow: hidden;
+}
+
+.page-strip-scroll {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 100%;
+  padding: 0 14px;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #a0a0a0 transparent;
+}
+
+.page-strip-scroll::-webkit-scrollbar { height: 3px; }
+.page-strip-scroll::-webkit-scrollbar-thumb { background: #a0a0a0; border-radius: 2px; }
+.page-strip-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Spread group (the clickable unit) ───────────────────────────────────── */
+
+.page-strip-spread {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 3px;
+  border: 1.5px solid transparent;
+  border-radius: 1px;
+  transition: border-color 0.15s;
+}
+
+.page-strip-spread:hover:not(.page-strip-spread--active) {
+  border-color: #c0c0c0;
+}
+
+.page-strip-spread--active {
+  border-color: var(--color-blue);
+}
+
+/* ── Individual page inside a spread ─────────────────────────────────────── */
+
+.page-strip-page-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* vertical book ratio 816:1058 ≈ 0.77 — width=40, height=52 */
+.page-strip-page-rect {
+  width: 40px;
+  height: 52px;
+  background: #d9d9d9;
+  border: 1px solid #c0c0c0;
+  flex-shrink: 0;
+}
+
+.page-strip-page-label {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-black);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.page-strip-page-label--special {
+  font-weight: 500;
+}
+
+/* ── Add spread button ───────────────────────────────────────────────────── */
+
+.page-strip-add {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #c0c0c0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-black);
+  margin-left: 4px;
+  transition: background 0.12s, border-color 0.12s;
+  align-self: center;
+}
+
+.page-strip-add:hover {
+  background: var(--color-cream);
+  border-color: var(--color-black);
+}

@@ -1,22 +1,31 @@
-/* ─── Wrapper — ocupa todo el espacio disponible entre los paneles ─────────── */
+/* ─── Outer container — fills available space, holds overlay ────────────────── */
 
-.canvas-wrapper {
+.canvas-outer {
   flex: 1;
-  overflow: auto;
+  position: relative;
+  overflow: hidden;
   background: #efefef;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 32px 0 40px;
 }
 
-/* Reserva el espacio real que ocupa el spread escalado */
+/* ─── Inner scroll area — centers the spread ────────────────────────────────── */
+
+.canvas-inner {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+}
+
+/* Reserves the exact scaled space for the spread */
 .canvas-scale-anchor {
   position: relative;
   flex-shrink: 0;
 }
 
-/* El contenido a escalar — transformOrigin: top left */
+/* The unscaled spread root — scaled via transform */
 .canvas-spread-root {
   position: absolute;
   top: 0;
@@ -26,7 +35,7 @@
   align-items: flex-start;
 }
 
-/* ─── Ruler ─────────────────────────────────────────────────────────────────── */
+/* ─── Rulers ─────────────────────────────────────────────────────────────────── */
 
 .canvas-ruler-row {
   display: flex;
@@ -48,7 +57,6 @@
 }
 
 .canvas-ruler-spine-gap {
-  /* matches the 1px spine */
   width: 1px;
   height: 22px;
   background: #efefef;
@@ -67,7 +75,7 @@
   flex-shrink: 0;
 }
 
-/* ─── Columna de página ─────────────────────────────────────────────────────── */
+/* ─── Page column ────────────────────────────────────────────────────────────── */
 
 .canvas-page-col {
   display: flex;
@@ -91,10 +99,9 @@
   position: relative;
   border: 1px solid #000;
   background: #ffffff;
-  line-height: 0; /* evita espacio extra debajo del canvas */
+  line-height: 0;
 }
 
-/* Bleed overlay — encima del canvas, pointer-events:none */
 .canvas-bleed-overlay {
   position: absolute;
   top: 0;
@@ -102,19 +109,18 @@
   pointer-events: none;
 }
 
-/* ─── Lomo / spine ──────────────────────────────────────────────────────────── */
+/* ─── Spine ──────────────────────────────────────────────────────────────────── */
 
 .canvas-spine {
   width: 1px;
-  /* Se alinea con la altura de la página, no de la columna completa (que incluye el número) */
   align-self: flex-end;
-  height: 1058px; /* PAGE_H — se sobreescribe en runtime pero evita flicker */
+  height: 1058px;
   background: #000;
   flex-shrink: 0;
-  margin-top: 32px; /* compensa el canvas-page-num height */
+  margin-top: 32px;
 }
 
-/* ─── Navegación ────────────────────────────────────────────────────────────── */
+/* ─── Navigation ─────────────────────────────────────────────────────────────── */
 
 .canvas-nav {
   display: flex;
@@ -154,4 +160,22 @@
   color: var(--color-text);
   white-space: nowrap;
   user-select: none;
+}
+
+/* ─── Zoom badge ─────────────────────────────────────────────────────────────── */
+
+.canvas-zoom-badge {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  background: rgba(25, 25, 25, 0.55);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 3px;
+  pointer-events: none;
+  user-select: none;
+  letter-spacing: 0.3px;
 }

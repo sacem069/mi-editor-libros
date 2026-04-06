@@ -10,6 +10,18 @@ const PAGE_W = BOOK_SIZE.widthPx   // 816
 const PAGE_H = BOOK_SIZE.heightPx  // 1058
 const BLEED  = BOOK_SIZE.bleedPx   // 11
 
+// Unscaled full spread dimensions (rulers + page nums + canvases + nav)
+const RULER    = 22
+const PAGE_NUM = 32
+const NAV      = 72
+const SPINE    = 1
+
+const SPREAD_W = RULER + PAGE_W + SPINE + PAGE_W   // 1655
+const SPREAD_H = RULER + PAGE_NUM + PAGE_H + NAV   // 1184
+
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 2.0
+
 interface CanvasProps {
   zoom: number
   showBleed: boolean
@@ -18,12 +30,12 @@ interface CanvasProps {
   onObjectSelected: (obj: fabric.FabricObject | null) => void
   onCanvasReady: (left: fabric.Canvas, right: fabric.Canvas) => void
   onSpreadChange: (spread: number) => void
+  onZoomChange: (zoom: number) => void
 }
 
-// Spread 0 = Contratapa | Tapa. Spread 1+ = interior pages.
 function spreadLabel(spread: number): { left: string; right: string } {
   if (spread === 0) return { left: 'Contra', right: 'Tapa' }
-  const left = String(spread * 2).padStart(2, '0')
+  const left  = String(spread * 2).padStart(2, '0')
   const right = String(spread * 2 + 1).padStart(2, '0')
   return { left, right }
 }
@@ -38,8 +50,7 @@ function BleedOverlay() {
       aria-hidden="true"
     >
       <rect
-        x={BLEED}
-        y={BLEED}
+        x={BLEED} y={BLEED}
         width={PAGE_W - BLEED * 2}
         height={PAGE_H - BLEED * 2}
         fill="none"
@@ -59,56 +70,86 @@ export default function Canvas({
   onObjectSelected,
   onCanvasReady,
   onSpreadChange,
+  onZoomChange,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
   const leftFabric  = useRef<fabric.Canvas | null>(null)
   const rightFabric = useRef<fabric.Canvas | null>(null)
+  const outerRef    = useRef<HTMLDivElement>(null)
 
-  // Keep callbacks in refs so the useEffect dep array stays stable
+  // Mirror latest callbacks/values into refs so effects stay stable
   const onObjectSelectedRef = useRef(onObjectSelected)
   const onCanvasReadyRef    = useRef(onCanvasReady)
+  const onZoomChangeRef     = useRef(onZoomChange)
+  const zoomRef             = useRef(zoom)
   useEffect(() => { onObjectSelectedRef.current = onObjectSelected }, [onObjectSelected])
   useEffect(() => { onCanvasReadyRef.current    = onCanvasReady    }, [onCanvasReady])
+  useEffect(() => { onZoomChangeRef.current     = onZoomChange     }, [onZoomChange])
+  useEffect(() => { zoomRef.current             = zoom             }, [zoom])
+
+  // ── Initial zoom: 80% fill (mount only, user wheel overrides after) ───────
+  useEffect(() => {
+    const el = outerRef.current
+    if (!el) return
+    const pad  = 80
+    const zoomW = (el.clientWidth  - pad) / SPREAD_W
+    const zoomH = (el.clientHeight - pad) / SPREAD_H
+    const initial = parseFloat(
+      Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(zoomW, zoomH) * 0.8)).toFixed(3)
+    )
+    onZoomChangeRef.current(initial)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Mouse wheel / pinch zoom ──────────────────────────────────────────────
+  useEffect(() => {
+    const el = outerRef.current
+    if (!el) return
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+
+      let dy = e.deltaY
+      if (e.deltaMode === 1) dy *= 16   // LINE mode → px
+      if (e.deltaMode === 2) dy *= 100  // PAGE mode → px
+
+      // ctrlKey signals a pinch gesture on Mac trackpad
+      const sensitivity = e.ctrlKey ? 0.02 : 0.003
+      const factor      = 1 - dy * sensitivity
+      const next        = parseFloat(
+        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomRef.current * factor)).toFixed(3)
+      )
+      onZoomChangeRef.current(next)
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
 
   // ── Fabric initialisation (mount only) ────────────────────────────────────
   useEffect(() => {
     if (!leftElRef.current || !rightElRef.current) return
 
     const lc = new fabric.Canvas(leftElRef.current, {
-      width: PAGE_W,
-      height: PAGE_H,
-      backgroundColor: '#ffffff',
-      selection: true,
+      width: PAGE_W, height: PAGE_H, backgroundColor: '#ffffff', selection: true,
     })
     const rc = new fabric.Canvas(rightElRef.current, {
-      width: PAGE_W,
-      height: PAGE_H,
-      backgroundColor: '#ffffff',
-      selection: true,
+      width: PAGE_W, height: PAGE_H, backgroundColor: '#ffffff', selection: true,
     })
 
     leftFabric.current  = lc
     rightFabric.current = rc
 
-    const bindEvents = (fc: fabric.Canvas) => {
-      fc.on('selection:created', (e) =>
-        onObjectSelectedRef.current(e.selected?.[0] ?? null),
-      )
-      fc.on('selection:updated', (e) =>
-        onObjectSelectedRef.current(e.selected?.[0] ?? null),
-      )
-      fc.on('selection:cleared', () => onObjectSelectedRef.current(null))
+    const bind = (fc: fabric.Canvas) => {
+      fc.on('selection:created', (e) => onObjectSelectedRef.current(e.selected?.[0] ?? null))
+      fc.on('selection:updated', (e) => onObjectSelectedRef.current(e.selected?.[0] ?? null))
+      fc.on('selection:cleared', ()  => onObjectSelectedRef.current(null))
     }
-    bindEvents(lc)
-    bindEvents(rc)
-
+    bind(lc)
+    bind(rc)
     onCanvasReadyRef.current(lc, rc)
 
-    return () => {
-      lc.dispose()
-      rc.dispose()
-    }
+    return () => { lc.dispose(); rc.dispose() }
   }, [])
 
   // ── Drag & drop ───────────────────────────────────────────────────────────
@@ -116,20 +157,15 @@ export default function Canvas({
     (getFabric: () => fabric.Canvas | null) =>
       async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault()
-        const fc = getFabric()
+        const fc  = getFabric()
         if (!fc) return
-
         const src = e.dataTransfer.getData('text/plain')
         if (!src) return
-
-        const wrapRect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-        const x = (e.clientX - wrapRect.left)  / zoom
-        const y = (e.clientY - wrapRect.top)   / zoom
-
+        const rect  = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+        const x     = (e.clientX - rect.left) / zoom
+        const y     = (e.clientY - rect.top)  / zoom
         const frame = findFrameAtPoint(fc, x, y)
-        if (frame) {
-          await dropPhotoOnFrame(fc, frame as fabric.Rect, src, PAGE_W, PAGE_H)
-        }
+        if (frame) await dropPhotoOnFrame(fc, frame as fabric.Rect, src, PAGE_W, PAGE_H)
       },
     [zoom],
   )
@@ -140,91 +176,68 @@ export default function Canvas({
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread)
-
   const goLeft  = () => onSpreadChange(Math.max(0, currentSpread - 1))
   const goRight = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const scaledW = (PAGE_W * 2 + 1) * zoom  // 1px spine
-  const scaledH = PAGE_H * zoom
+  const scaledW = SPREAD_W * zoom
+  const scaledH = SPREAD_H * zoom
 
   return (
-    <div className="canvas-wrapper">
-      {/* Outer box reserves the scaled space so sibling panels aren't pushed */}
-      <div
-        className="canvas-scale-anchor"
-        style={{ width: scaledW, height: scaledH + 80 /* nav */ }}
-      >
-        <div
-          className="canvas-spread-root"
-          style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-        >
-          {/* ── Ruler row ── */}
-          <div className="canvas-ruler-row">
-            <div className="canvas-ruler-corner" />
-            <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
-            <div className="canvas-ruler-spine-gap" />
-            <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
-          </div>
+    <div className="canvas-outer" ref={outerRef}>
+      {/* ── Scrollable + centered area ── */}
+      <div className="canvas-inner">
+        <div className="canvas-scale-anchor" style={{ width: scaledW, height: scaledH }}>
+          <div
+            className="canvas-spread-root"
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+          >
+            {/* Ruler row */}
+            <div className="canvas-ruler-row">
+              <div className="canvas-ruler-corner" />
+              <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
+              <div className="canvas-ruler-spine-gap" />
+              <div className="canvas-ruler-h" style={{ width: PAGE_W }} />
+            </div>
 
-          {/* ── Pages row ── */}
-          <div className="canvas-pages-row">
-            {/* Vertical ruler */}
-            <div className="canvas-ruler-v" style={{ height: PAGE_H }} />
+            {/* Pages row */}
+            <div className="canvas-pages-row">
+              <div className="canvas-ruler-v" style={{ height: PAGE_H }} />
 
-            {/* Left page */}
-            <div className="canvas-page-col">
-              <div className="canvas-page-num">{leftLabel}</div>
-              <div
-                className="canvas-page-wrap"
-                onDrop={handleDropLeft}
-                onDragOver={handleDragOver}
-              >
-                <canvas ref={leftElRef} />
-                {showBleed && <BleedOverlay />}
+              {/* Left page */}
+              <div className="canvas-page-col">
+                <div className="canvas-page-num">{leftLabel}</div>
+                <div className="canvas-page-wrap" onDrop={handleDropLeft} onDragOver={handleDragOver}>
+                  <canvas ref={leftElRef} />
+                  {showBleed && <BleedOverlay />}
+                </div>
+              </div>
+
+              <div className="canvas-spine" />
+
+              {/* Right page */}
+              <div className="canvas-page-col">
+                <div className="canvas-page-num">{rightLabel}</div>
+                <div className="canvas-page-wrap" onDrop={handleDropRight} onDragOver={handleDragOver}>
+                  <canvas ref={rightElRef} />
+                  {showBleed && <BleedOverlay />}
+                </div>
               </div>
             </div>
 
-            {/* Spine */}
-            <div className="canvas-spine" />
-
-            {/* Right page */}
-            <div className="canvas-page-col">
-              <div className="canvas-page-num">{rightLabel}</div>
-              <div
-                className="canvas-page-wrap"
-                onDrop={handleDropRight}
-                onDragOver={handleDragOver}
-              >
-                <canvas ref={rightElRef} />
-                {showBleed && <BleedOverlay />}
-              </div>
+            {/* Navigation */}
+            <div className="canvas-nav">
+              <button className="canvas-nav-arrow" onClick={goLeft}  disabled={currentSpread === 0}              aria-label="Página anterior">{'<'}</button>
+              <span   className="canvas-nav-label">Página&nbsp;&nbsp;{leftLabel} - {rightLabel}</span>
+              <button className="canvas-nav-arrow" onClick={goRight} disabled={currentSpread === totalSpreads - 1} aria-label="Página siguiente">{'>'}</button>
             </div>
-          </div>
-
-          {/* ── Navigation ── */}
-          <div className="canvas-nav">
-            <button
-              className="canvas-nav-arrow"
-              onClick={goLeft}
-              disabled={currentSpread === 0}
-              aria-label="Página anterior"
-            >
-              {'<'}
-            </button>
-            <span className="canvas-nav-label">
-              Página&nbsp;&nbsp;{leftLabel} - {rightLabel}
-            </span>
-            <button
-              className="canvas-nav-arrow"
-              onClick={goRight}
-              disabled={currentSpread === totalSpreads - 1}
-              aria-label="Página siguiente"
-            >
-              {'>'}
-            </button>
           </div>
         </div>
+      </div>
+
+      {/* ── Zoom badge ── */}
+      <div className="canvas-zoom-badge" aria-label={`Zoom ${Math.round(zoom * 100)}%`}>
+        {Math.round(zoom * 100)}%
       </div>
     </div>
   )

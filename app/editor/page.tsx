@@ -8,15 +8,17 @@ import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
 import LayoutPanel from '../components/LayoutPanel/LayoutPanel'
 import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 import Toolbar from '../components/Toolbar/Toolbar'
+import PageStrip from '../components/PageStrip/PageStrip'
 import './editor.css'
 
 export default function EditorPage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [usedPhotoIds, setUsedPhotoIds] = useState<Set<string>>(new Set())
-  const [zoom, setZoom] = useState(0.6)
+  const [zoom, setZoom] = useState(0.35) // overridden by Canvas ResizeObserver on mount
   const [showBleed, setShowBleed] = useState(false)
   const [currentSpread, setCurrentSpread] = useState(0)
-  const totalSpreads = 8 // placeholder
+  const [totalContentSpreads, setTotalContentSpreads] = useState(13) // 13 variable spreads = 26 pages
+  const totalSpreads = totalContentSpreads + 3 // cover + inside + 13 variable + outside
 
   const [selectedPhotoCount, setSelectedPhotoCount] = useState(1)
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null)
@@ -114,6 +116,13 @@ export default function EditorPage() {
             onObjectSelected={handleObjectSelected}
             onCanvasReady={handleCanvasReady}
             onSpreadChange={setCurrentSpread}
+            onZoomChange={setZoom}
+          />
+          <PageStrip
+            currentSpread={currentSpread}
+            totalContentSpreads={totalContentSpreads}
+            onSpreadSelect={setCurrentSpread}
+            onAddSpread={() => setTotalContentSpreads((n) => n + 1)}
           />
         </div>
         <LayoutPanel
