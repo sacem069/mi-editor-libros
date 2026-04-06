@@ -11,5 +11,12 @@
   flex-direction: row;
   flex: 1;
   overflow: hidden;
-  margin-top: 50px; /* altura del Topbar */
+  margin-top: 50px; /* Topbar height */
+}
+
+.editor-center {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }

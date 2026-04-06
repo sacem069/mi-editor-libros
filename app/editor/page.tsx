@@ -7,6 +7,7 @@ import Canvas from '../components/Canvas/Canvas'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
 import LayoutPanel from '../components/LayoutPanel/LayoutPanel'
 import type { Layout } from '../components/LayoutPanel/LayoutPanel'
+import Toolbar from '../components/Toolbar/Toolbar'
 import './editor.css'
 
 export default function EditorPage() {
@@ -19,6 +20,8 @@ export default function EditorPage() {
 
   const [selectedPhotoCount, setSelectedPhotoCount] = useState(1)
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
 
   const leftCanvasRef  = useRef<fabric.Canvas | null>(null)
   const rightCanvasRef = useRef<fabric.Canvas | null>(null)
@@ -67,6 +70,22 @@ export default function EditorPage() {
     // futuro: aplicar layout al canvas
   }, [])
 
+  // ── Undo / Redo (placeholders — se conectarán con el historial del canvas) ──
+
+  const handleUndo = useCallback(() => {
+    // futuro: leftCanvasRef.current?.undo()
+  }, [])
+
+  const handleRedo = useCallback(() => {
+    // futuro: leftCanvasRef.current?.redo()
+  }, [])
+
+  // ── Add text ──────────────────────────────────────────────────────────────
+
+  const handleAddText = useCallback(() => {
+    // futuro: agregar IText al canvas activo
+  }, [])
+
   return (
     <div className="editor-root">
       <Topbar />
@@ -77,15 +96,26 @@ export default function EditorPage() {
           onUpload={handleUpload}
           onPhotoClick={() => {}}
         />
-        <Canvas
-          zoom={zoom}
-          showBleed={showBleed}
-          currentSpread={currentSpread}
-          totalSpreads={totalSpreads}
-          onObjectSelected={handleObjectSelected}
-          onCanvasReady={handleCanvasReady}
-          onSpreadChange={setCurrentSpread}
-        />
+        <div className="editor-center">
+          <Toolbar
+            canUndo={canUndo}
+            canRedo={canRedo}
+            showBleed={showBleed}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onToggleBleed={() => setShowBleed((v) => !v)}
+            onAddText={handleAddText}
+          />
+          <Canvas
+            zoom={zoom}
+            showBleed={showBleed}
+            currentSpread={currentSpread}
+            totalSpreads={totalSpreads}
+            onObjectSelected={handleObjectSelected}
+            onCanvasReady={handleCanvasReady}
+            onSpreadChange={setCurrentSpread}
+          />
+        </div>
         <LayoutPanel
           selectedPhotoCount={selectedPhotoCount}
           selectedLayoutId={selectedLayoutId}
