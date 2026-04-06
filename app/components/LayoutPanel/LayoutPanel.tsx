@@ -73,6 +73,11 @@ export default function LayoutPanel({
             onClick={() => onLayoutSelect(layout)}
             title={layout.nombre}
             aria-label={layout.nombre}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData('application/zeika-layout', layout.id)
+              e.dataTransfer.effectAllowed = 'copy'
+            }}
           >
             <LayoutThumbnail layout={layout} />
           </button>

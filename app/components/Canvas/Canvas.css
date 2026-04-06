@@ -132,6 +132,31 @@
 
 /* ─── Zoom badge ─────────────────────────────────────────────────────────────── */
 
+/* ─── Text delete button ─────────────────────────────────────────────────────── */
+
+.canvas-text-delete {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #191919;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transform: translate(2px, -10px);
+  z-index: 10;
+}
+
+.canvas-text-delete:hover {
+  background: #444;
+}
+
+/* ─── Zoom badge ─────────────────────────────────────────────────────────────── */
+
 .canvas-zoom-badge {
   position: absolute;
   bottom: 14px;

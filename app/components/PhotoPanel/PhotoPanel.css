@@ -49,6 +49,72 @@
   background: var(--color-cream);
 }
 
+.photo-action-btn--active {
+  background: var(--color-cream);
+}
+
+/* ─── Filter wrap + panel ────────────────────────────────────────────────────── */
+
+.photo-filter-wrap {
+  position: relative;
+}
+
+.photo-filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 156px;
+  background: #262626;
+  border: 1px solid #373737;
+  border-radius: 2px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  z-index: 50;
+  padding: 12px 0 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-filter-heading {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: #f5f5f5;
+  padding: 0 12px;
+  margin: 0 0 6px;
+}
+
+.photo-filter-heading--spaced {
+  margin-top: 16px;
+}
+
+.photo-filter-underline {
+  height: 1.5px;
+  background: var(--color-blue);
+  margin: 0 12px 6px;
+}
+
+.photo-filter-option {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: #c8c8c8;
+  text-align: left;
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.photo-filter-option:hover {
+  color: #f5f5f5;
+}
+
+.photo-filter-option--active {
+  color: #f5f5f5;
+  font-weight: 600;
+}
+
 /* ─── File input oculto ──────────────────────────────────────────────────────── */
 
 .photo-file-input {

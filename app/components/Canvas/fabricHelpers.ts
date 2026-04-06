@@ -46,15 +46,19 @@ export function createEmptyFrame(
   const frameH = pctToPx(frame.h, pageH)
 
   const rect = new fabric.Rect({
-    left: frameX,
-    top: frameY,
-    width: frameW,
-    height: frameH,
-    fill: '#F0EFEB',
-    stroke: '#528ED6',
+    left:    frameX,
+    top:     frameY,
+    width:   frameW,
+    height:  frameH,
+    originX: 'left',   // explicit: left/top are the top-left corner
+    originY: 'top',
+    fill:         '#F0EFEB',
+    stroke:       '#528ED6',
+    strokeWidth:  1,
     strokeDashArray: [5, 5],
+    strokeUniform:   true,  // keeps stroke 1px regardless of scale
     selectable: false,
-    evented: true,
+    evented:    true,
   }) as fabric.Rect & { data: FrameData }
 
   rect.data = {

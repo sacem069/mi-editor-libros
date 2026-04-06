@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
+import { X } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
 import { dropPhotoOnFrame, findFrameAtPoint } from './fabricHelpers'
 import './Canvas.css'
@@ -77,6 +78,11 @@ export default function Canvas({
   const rightFabric = useRef<fabric.Canvas | null>(null)
   const outerRef    = useRef<HTMLDivElement>(null)
 
+  // ── Selected textbox tracking (for delete button) ─────────────────────────
+  type TextSel = { side: 'left' | 'right'; top: number; left: number; width: number } | null
+  const [textSel,     setTextSel]     = useState<TextSel>(null)
+  const [textEditing, setTextEditing] = useState(false)
+
   // Mirror latest callbacks/values into refs so effects stay stable
   const onObjectSelectedRef = useRef(onObjectSelected)
   const onCanvasReadyRef    = useRef(onCanvasReady)
@@ -131,16 +137,65 @@ export default function Canvas({
     leftFabric.current  = lc
     rightFabric.current = rc
 
-    const bind = (fc: fabric.Canvas) => {
-      fc.on('selection:created', (e) => onObjectSelectedRef.current(e.selected?.[0] ?? null))
-      fc.on('selection:updated', (e) => onObjectSelectedRef.current(e.selected?.[0] ?? null))
-      fc.on('selection:cleared', ()  => onObjectSelectedRef.current(null))
+    const updateTextSel = (obj: fabric.FabricObject | null | undefined, side: 'left' | 'right') => {
+      if (obj instanceof fabric.Textbox) {
+        const br = obj.getBoundingRect()
+        setTextSel({ side, top: br.top, left: br.left, width: br.width })
+      } else {
+        setTextSel(null)
+      }
     }
-    bind(lc)
-    bind(rc)
+
+    const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
+      fc.on('selection:created', (e) => {
+        onObjectSelectedRef.current(e.selected?.[0] ?? null)
+        updateTextSel(e.selected?.[0], side)
+      })
+      fc.on('selection:updated', (e) => {
+        onObjectSelectedRef.current(e.selected?.[0] ?? null)
+        updateTextSel(e.selected?.[0], side)
+      })
+      fc.on('selection:cleared', () => {
+        onObjectSelectedRef.current(null)
+        setTextSel(null)
+      })
+      fc.on('object:modified', (e) => {
+        if (e.target instanceof fabric.Textbox) {
+          const br = e.target.getBoundingRect()
+          setTextSel({ side, top: br.top, left: br.left, width: br.width })
+        }
+      })
+      fc.on('text:editing:entered', () => setTextEditing(true))
+      fc.on('text:editing:exited',  () => setTextEditing(false))
+    }
+    bind(lc, 'left')
+    bind(rc, 'right')
     onCanvasReadyRef.current(lc, rc)
 
-    return () => { lc.dispose(); rc.dispose() }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      // Don't interfere with text editing or regular inputs
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+      for (const fc of [lc, rc]) {
+        const obj = fc.getActiveObject()
+        if (obj instanceof fabric.Textbox) {
+          if ((obj as fabric.Textbox).isEditing) return
+          fc.remove(obj)
+          fc.renderAll()
+          setTextSel(null)
+          return
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      lc.dispose()
+      rc.dispose()
+    }
   }, [])
 
   // ── Drag & drop ───────────────────────────────────────────────────────────
@@ -192,6 +247,21 @@ export default function Canvas({
                 <div className="canvas-page-wrap" onDrop={handleDropLeft} onDragOver={handleDragOver}>
                   <canvas ref={leftElRef} />
                   {showBleed && <BleedOverlay />}
+                  {textSel?.side === 'left' && !textEditing && (
+                    <button
+                      className="canvas-text-delete"
+                      style={{ top: textSel.top, left: textSel.left + textSel.width }}
+                      onClick={() => {
+                        const fc = leftFabric.current
+                        if (!fc) return
+                        const obj = fc.getActiveObject()
+                        if (obj) { fc.remove(obj); fc.renderAll(); setTextSel(null) }
+                      }}
+                      aria-label="Eliminar texto"
+                    >
+                      <X size={9} strokeWidth={2.5} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -203,6 +273,21 @@ export default function Canvas({
                 <div className="canvas-page-wrap" onDrop={handleDropRight} onDragOver={handleDragOver}>
                   <canvas ref={rightElRef} />
                   {showBleed && <BleedOverlay />}
+                  {textSel?.side === 'right' && !textEditing && (
+                    <button
+                      className="canvas-text-delete"
+                      style={{ top: textSel.top, left: textSel.left + textSel.width }}
+                      onClick={() => {
+                        const fc = rightFabric.current
+                        if (!fc) return
+                        const obj = fc.getActiveObject()
+                        if (obj) { fc.remove(obj); fc.renderAll(); setTextSel(null) }
+                      }}
+                      aria-label="Eliminar texto"
+                    >
+                      <X size={9} strokeWidth={2.5} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

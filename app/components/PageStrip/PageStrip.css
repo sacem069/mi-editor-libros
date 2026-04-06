@@ -5,9 +5,23 @@
   flex-shrink: 0;
   background: var(--color-white);
   border-top: 1px solid var(--color-black);
+  display: flex;
+  flex-direction: row;
   overflow: hidden;
 }
 
+/* Fixed left panel — always visible, never scrolls */
+.page-strip-fixed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+  border-right: 1px solid #e0e0e0;
+  background: var(--color-white);
+}
+
+/* Scrollable spreads area */
 .page-strip-scroll {
   display: flex;
   flex-direction: row;
@@ -19,6 +33,7 @@
   overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: #a0a0a0 transparent;
+  flex: 1;
 }
 
 .page-strip-scroll::-webkit-scrollbar { height: 3px; }
@@ -37,6 +52,7 @@
   border: 1.5px solid transparent;
   border-radius: 1px;
   transition: border-color 0.15s;
+  position: relative;
 }
 
 .page-strip-spread:hover:not(.page-strip-spread--active) {
@@ -47,13 +63,42 @@
   border-color: var(--color-blue);
 }
 
+.page-strip-spread--drag-over {
+  border-color: var(--color-blue);
+  background: #e8f0fb;
+}
+
+/* ── Delete spread button ────────────────────────────────────────────────── */
+
+.page-strip-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  background: #191919;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  padding: 0;
+  z-index: 2;
+}
+
 /* ── Individual page inside a spread ─────────────────────────────────────── */
 
 .page-strip-page-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  align-items: flex-start;   /* left page: label at left corner */
+  gap: 3px;
+}
+
+.page-strip-page-wrap--right {
+  align-items: flex-end;     /* right page: label at right corner */
 }
 
 /* vertical book ratio 816:1058 ≈ 0.77 — width=40, height=52 */
@@ -92,7 +137,6 @@
   justify-content: center;
   cursor: pointer;
   color: var(--color-black);
-  margin-left: 4px;
   transition: background 0.12s, border-color 0.12s;
   align-self: center;
 }

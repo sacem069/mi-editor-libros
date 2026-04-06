@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
 import { CirclePlus, ListFilter, Check } from 'lucide-react'
 import './PhotoPanel.css'
 
@@ -17,13 +17,34 @@ interface PhotoPanelProps {
   onPhotoClick: (photo: Photo) => void
 }
 
+type SortBy     = 'fecha' | 'nombre'
+type ShowFilter = 'todas' | 'usadas' | 'sin-usar'
+
 export default function PhotoPanel({
   photos,
   usedPhotoIds,
   onUpload,
   onPhotoClick,
 }: PhotoPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const filterWrapRef = useRef<HTMLDivElement>(null)
+
+  const [filterOpen,  setFilterOpen]  = useState(false)
+  const [sortBy,      setSortBy]      = useState<SortBy>('fecha')
+  const [showFilter,  setShowFilter]  = useState<ShowFilter>('todas')
+
+  // ── Close filter panel on outside click ──────────────────────────────────
+
+  useEffect(() => {
+    if (!filterOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (filterWrapRef.current && !filterWrapRef.current.contains(e.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [filterOpen])
 
   // ── File upload ───────────────────────────────────────────────────────────
 
@@ -32,7 +53,6 @@ export default function PhotoPanel({
       const files = Array.from(e.target.files ?? [])
       if (files.length === 0) return
       onUpload(files)
-      // Reset so the same files can be re-selected if needed
       e.target.value = ''
     },
     [onUpload],
@@ -50,6 +70,18 @@ export default function PhotoPanel({
     [],
   )
 
+  // ── Filtered + sorted photo list ──────────────────────────────────────────
+
+  const visiblePhotos = photos
+    .filter((p) => {
+      if (showFilter === 'usadas')   return usedPhotoIds.has(p.id)
+      if (showFilter === 'sin-usar') return !usedPhotoIds.has(p.id)
+      return true
+    })
+    .sort((a, b) =>
+      sortBy === 'nombre' ? a.name.localeCompare(b.name) : 0
+    )
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -61,10 +93,58 @@ export default function PhotoPanel({
           <span>Subir fotos</span>
         </button>
 
-        <button className="photo-action-btn">
-          <ListFilter size={24} strokeWidth={1.5} />
-          <span>Ordenar / Filtrar</span>
-        </button>
+        {/* Filter button + dropdown */}
+        <div className="photo-filter-wrap" ref={filterWrapRef}>
+          <button
+            className={`photo-action-btn${filterOpen ? ' photo-action-btn--active' : ''}`}
+            onClick={() => setFilterOpen((v) => !v)}
+          >
+            <ListFilter size={24} strokeWidth={1.5} />
+            <span>Ordenar / Filtrar</span>
+          </button>
+
+          {filterOpen && (
+            <div className="photo-filter-panel">
+              {/* Ordenar por */}
+              <p className="photo-filter-heading">Ordenar por</p>
+              <div className="photo-filter-underline" />
+              <button
+                className={`photo-filter-option${sortBy === 'fecha' ? ' photo-filter-option--active' : ''}`}
+                onClick={() => setSortBy('fecha')}
+              >
+                Fecha Agregada
+              </button>
+              <button
+                className={`photo-filter-option${sortBy === 'nombre' ? ' photo-filter-option--active' : ''}`}
+                onClick={() => setSortBy('nombre')}
+              >
+                Nombre
+              </button>
+
+              {/* Mostrar/Ocultar */}
+              <p className="photo-filter-heading photo-filter-heading--spaced">Mostrar/Ocultar</p>
+              <div className="photo-filter-underline" />
+              <button
+                className={`photo-filter-option${showFilter === 'todas' ? ' photo-filter-option--active' : ''}`}
+                onClick={() => setShowFilter('todas')}
+              >
+                Todas
+              </button>
+              <button
+                className={`photo-filter-option${showFilter === 'usadas' ? ' photo-filter-option--active' : ''}`}
+                onClick={() => setShowFilter('usadas')}
+              >
+                Usadas
+              </button>
+              <button
+                className={`photo-filter-option${showFilter === 'sin-usar' ? ' photo-filter-option--active' : ''}`}
+                onClick={() => setShowFilter('sin-usar')}
+              >
+                Sin Usar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <input
@@ -91,7 +171,7 @@ export default function PhotoPanel({
 
       {/* ── Grid de fotos ── */}
       <div className="photo-grid">
-        {photos.map((photo) => {
+        {visiblePhotos.map((photo) => {
           const isUsed = usedPhotoIds.has(photo.id)
           return (
             <div

@@ -15,6 +15,7 @@ import { BOOK_SIZE }                                      from '../config/bookSi
 import { applyLayout, addTextBox, serializePage,
          deserializePage, dropPhotoOnFrame }              from '../components/Canvas/fabricHelpers'
 import type { PageData }                                   from '../components/Canvas/fabricHelpers'
+import { LAYOUTS }                                         from '../config/layouts'
 
 import './editor.css'
 
@@ -242,6 +243,41 @@ export default function EditorPage() {
     setTotalContentSpreads((n) => n + 1)
   }, [])
 
+  // ── Delete spread ──────────────────────────────────────────────────────────
+  const handleDeleteSpread = useCallback(async (spreadIndex: number) => {
+    if (totalContentSpreads <= 13) return
+
+    // Shift localStorage entries: everything after spreadIndex moves down by 1
+    const lastIndex = totalContentSpreads + 2 // current last fixed spread index
+    for (let j = spreadIndex; j <= lastIndex; j++) {
+      const next = localStorage.getItem(`zeika-spread-${j + 1}`)
+      if (next) localStorage.setItem(`zeika-spread-${j}`, next)
+      else      localStorage.removeItem(`zeika-spread-${j}`)
+    }
+
+    const newTotal = totalContentSpreads - 1
+    const maxSpread = newTotal + 2 // new last valid spread index
+
+    // Determine what spread to navigate to after deletion
+    let target = currentSpreadRef.current
+    if (target > maxSpread)      target = maxSpread
+    else if (target >= spreadIndex && target > 0) target = target - 1
+
+    setTotalContentSpreads(newTotal)
+    await handleSpreadSelect(target)
+  }, [totalContentSpreads, handleSpreadSelect])
+
+  // ── Layout drop on PageStrip spread ───────────────────────────────────────
+  const handleLayoutDrop = useCallback(async (spreadIndex: number, layoutId: string) => {
+    await handleSpreadSelect(spreadIndex)
+    const layout = LAYOUTS.find((l) => l.id === layoutId)
+    const lc = fabricLeft.current
+    if (!layout || !lc) return
+    setSelectedLayoutId(layoutId)
+    applyLayout(lc, layout, PAGE_W, PAGE_H)
+    saveCurrentSpread()
+  }, [handleSpreadSelect, saveCurrentSpread])
+
   // ── Zoom ───────────────────────────────────────────────────────────────────
   const handleZoomChange = useCallback((z: number) => {
     setZoom(z)
@@ -297,6 +333,8 @@ export default function EditorPage() {
             totalContentSpreads={totalContentSpreads}
             onSpreadSelect={handleSpreadSelect}
             onAddSpread={handleAddSpread}
+            onDeleteSpread={handleDeleteSpread}
+            onLayoutDrop={handleLayoutDrop}
           />
         </div>
 

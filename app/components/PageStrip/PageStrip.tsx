@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import './PageStrip.css'
 
 interface PageStripProps {
@@ -9,6 +9,8 @@ interface PageStripProps {
   totalContentSpreads: number
   onSpreadSelect: (index: number) => void
   onAddSpread: () => void
+  onDeleteSpread?: (index: number) => void
+  onLayoutDrop?: (spreadIndex: number, layoutId: string) => void
 }
 
 type PageInfo  = { label: string; special: boolean }
@@ -49,9 +51,13 @@ export default function PageStrip({
   totalContentSpreads,
   onSpreadSelect,
   onAddSpread,
+  onDeleteSpread,
+  onLayoutDrop,
 }: PageStripProps) {
-  const spreads   = buildSpreads(totalContentSpreads)
-  const activeRef = useRef<HTMLDivElement>(null)
+  const spreads    = buildSpreads(totalContentSpreads)
+  const activeRef  = useRef<HTMLDivElement>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [hoverIndex, setHoverIndex]       = useState<number | null>(null)
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({
@@ -59,44 +65,37 @@ export default function PageStrip({
     })
   }, [currentSpread])
 
+  // A spread is variable (deletable) if it's not one of the 3 fixed ones
+  const isVariable = (spreadIndex: number) =>
+    spreadIndex >= 2 && spreadIndex <= totalContentSpreads + 1
+
+  const canDelete = totalContentSpreads > 13
+
+  // ── Drag handlers for layout drop ─────────────────────────────────────────
+
+  const handleDragOver = (e: React.DragEvent, spreadIndex: number) => {
+    const layoutId = e.dataTransfer.types.includes('application/zeika-layout')
+    if (!layoutId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDragOverIndex(spreadIndex)
+  }
+
+  const handleDragLeave = () => setDragOverIndex(null)
+
+  const handleDrop = (e: React.DragEvent, spreadIndex: number) => {
+    setDragOverIndex(null)
+    const layoutId = e.dataTransfer.getData('application/zeika-layout')
+    if (!layoutId || !onLayoutDrop) return
+    e.preventDefault()
+    onLayoutDrop(spreadIndex, layoutId)
+  }
+
   return (
     <div className="page-strip">
-      <div className="page-strip-scroll">
 
-        {spreads.map((spread) => {
-          const active = spread.index === currentSpread
-          return (
-            <div
-              key={spread.index}
-              ref={active ? activeRef : null}
-              className={`page-strip-spread${active ? ' page-strip-spread--active' : ''}`}
-              onClick={() => onSpreadSelect(spread.index)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onSpreadSelect(spread.index)}
-              aria-current={active ? 'true' : undefined}
-              aria-label={`${spread.left.label} – ${spread.right.label}`}
-            >
-              {/* Left page */}
-              <div className="page-strip-page-wrap">
-                <div className="page-strip-page-rect" />
-                <span className={`page-strip-page-label${spread.left.special ? ' page-strip-page-label--special' : ''}`}>
-                  {spread.left.label}
-                </span>
-              </div>
-
-              {/* Right page */}
-              <div className="page-strip-page-wrap">
-                <div className="page-strip-page-rect" />
-                <span className={`page-strip-page-label${spread.right.special ? ' page-strip-page-label--special' : ''}`}>
-                  {spread.right.label}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-
-        {/* Add spread */}
+      {/* Fixed left section — always visible */}
+      <div className="page-strip-fixed">
         <button
           className="page-strip-add"
           onClick={onAddSpread}
@@ -105,7 +104,66 @@ export default function PageStrip({
         >
           <Plus size={14} strokeWidth={1.5} />
         </button>
+      </div>
 
+      {/* Scrollable spreads */}
+      <div className="page-strip-scroll">
+        {spreads.map((spread) => {
+          const active   = spread.index === currentSpread
+          const variable = isVariable(spread.index)
+          const dragOver = dragOverIndex === spread.index
+
+          return (
+            <div
+              key={spread.index}
+              ref={active ? activeRef : null}
+              className={[
+                'page-strip-spread',
+                active   ? 'page-strip-spread--active'   : '',
+                dragOver ? 'page-strip-spread--drag-over' : '',
+              ].filter(Boolean).join(' ')}
+              onClick={() => onSpreadSelect(spread.index)}
+              onMouseEnter={() => setHoverIndex(spread.index)}
+              onMouseLeave={() => setHoverIndex(null)}
+              onDragOver={(e) => handleDragOver(e, spread.index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, spread.index)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onSpreadSelect(spread.index)}
+              aria-current={active ? 'true' : undefined}
+              aria-label={`${spread.left.label} – ${spread.right.label}`}
+            >
+              {/* Delete button — only for variable spreads */}
+              {variable && canDelete && hoverIndex === spread.index && onDeleteSpread && (
+                <button
+                  className="page-strip-delete"
+                  onClick={(e) => { e.stopPropagation(); onDeleteSpread(spread.index) }}
+                  aria-label="Eliminar spread"
+                  title="Eliminar"
+                >
+                  <X size={8} strokeWidth={2.5} />
+                </button>
+              )}
+
+              {/* Left page */}
+              <div className="page-strip-page-wrap">
+                <span className={`page-strip-page-label${spread.left.special ? ' page-strip-page-label--special' : ''}`}>
+                  {spread.left.label}
+                </span>
+                <div className="page-strip-page-rect" />
+              </div>
+
+              {/* Right page */}
+              <div className="page-strip-page-wrap page-strip-page-wrap--right">
+                <span className={`page-strip-page-label${spread.right.special ? ' page-strip-page-label--special' : ''}`}>
+                  {spread.right.label}
+                </span>
+                <div className="page-strip-page-rect" />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
