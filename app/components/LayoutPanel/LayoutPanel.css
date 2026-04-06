@@ -1,0 +1,117 @@
+.layout-panel {
+  width: 200px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--color-white);
+  border-left: 1px solid var(--color-black);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.layout-panel-header {
+  padding: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.layout-panel-title {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-black);
+}
+
+.layout-panel-bar {
+  width: 167px;
+  height: 3px;
+  background: var(--color-blue);
+  border-radius: 2px;
+}
+
+/* ── Photo count selector ────────────────────────────────────────────────── */
+
+.layout-count-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  flex-shrink: 0;
+}
+
+.layout-count-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--color-black);
+  background: transparent;
+  color: var(--color-black);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.layout-count-btn--active {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+  color: var(--color-white);
+}
+
+.layout-count-btn:hover:not(.layout-count-btn--active) {
+  background: var(--color-cream);
+}
+
+/* ── Layout grid ─────────────────────────────────────────────────────────── */
+
+.layout-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  align-content: start;
+}
+
+.layout-thumb {
+  aspect-ratio: 816 / 1058;
+  background: var(--color-white);
+  border: 1px solid var(--color-black);
+  border-radius: 0;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.layout-thumb--selected {
+  border: 2px solid var(--color-blue);
+}
+
+.layout-thumb:hover:not(.layout-thumb--selected) {
+  border-color: #888;
+}
+
+/* ── Thumbnail frames ────────────────────────────────────────────────────── */
+
+.layout-thumb-inner {
+  position: absolute;
+  inset: 0;
+}
+
+.layout-thumb-frame {
+  position: absolute;
+  background: #d2d2d2;
+}

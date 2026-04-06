@@ -1,70 +1,70 @@
 @AGENTS.md
-# Zeika Builder — Contexto del proyecto
+# Zeika Builder — Project Context
 
-## Qué es este proyecto
-Plataforma interna para las diseñadoras de Zeika para crear fotolibros personalizados.
+## What this project is
+Internal platform for Zeika's design team to create personalized photo books.
 
-## Stack técnico
+## Tech stack
 - Next.js + React + TypeScript
-- Canvas: Fabric.js (ya instalado)
-- Fotos: Cloudinary
-- Base de datos: Supabase
+- Canvas: Fabric.js (already installed)
+- Photos: Cloudinary
+- Database: Supabase
 - Auth: NextAuth (Google login)
 - PDF: Puppeteer
-- Pagos: MercadoPago
+- Payments: MercadoPago
 - WhatsApp: Twilio
 - Deploy: Vercel
 
-## Identidad visual
-- Azul: #528ED6
-- Negro: #191919
-- Crema: #F0EFEB
-- Blanco: #FFFFFF
-- Tipografía display: Amandine (Adobe Fonts via Typekit: https://use.typekit.net/ddt8web.css)
-- Tipografía cuerpo: Overused Grotesk (archivos en /public/fonts/)
+## Visual identity
+- Blue: #528ED6
+- Black: #191919
+- Cream: #F0EFEB
+- White: #FFFFFF
+- Display font: Amandine (Adobe Fonts via Typekit: https://use.typekit.net/ddt8web.css)
+- Body font: Overused Grotesk (local files in /public/fonts/)
 
-## Estructura de carpetas
+## Folder structure
 src/app/
   components/
-    Topbar.tsx + Topbar.css (HECHO)
+    Topbar.tsx + Topbar.css (DONE)
     Canvas/
     PhotoPanel/
     LayoutPanel/
     PageStrip/
     Toolbar/
   config/
-    bookSizes.ts (PENDIENTE)
-    layouts.ts (PENDIENTE)
-  editor/page.tsx (PENDIENTE)
-  globals.css (HECHO)
-  layout.tsx (HECHO)
+    bookSizes.ts (PENDING)
+    layouts.ts (PENDING)
+  editor/page.tsx (PENDING)
+  globals.css (DONE)
+  layout.tsx (DONE)
 
-## Los 5 tamaños de libro
-- Chico Horizontal: 21x14.8cm → 794x559px → $75.500
-- Mediano Horizontal: 28x21.6cm → 1058x816px → $81.500
-- Grande Horizontal: 41x29cm → 1549x1096px → $100.000
-- Vertical: 21.6x28cm → 816x1058px → $81.500
-- Cuadrado: 29x29cm → 1096x1096px → $97.000
+## The 5 book sizes
+- Small Horizontal: 21x14.8cm → 794x559px → $75,500
+- Medium Horizontal: 28x21.6cm → 1058x816px → $81,500
+- Large Horizontal: 41x29cm → 1549x1096px → $100,000
+- Vertical: 21.6x28cm → 816x1058px → $81,500
+- Square: 29x29cm → 1096x1096px → $97,000
 
-## Los 20 layouts
-4 layouts por cada cantidad de fotos (1 a 5).
-Definidos en porcentajes — se adaptan a todos los tamaños.
+## The 20 layouts
+4 layouts per photo quantity (1 to 5).
+Defined in percentages — they adapt to all book sizes automatically.
 
-## Reglas importantes
-- SIEMPRE usar variables CSS de globals.css para colores y tipografías
-- El canvas usa 'use client' (Fabric.js no funciona en servidor)
-- Medidas en CM en la UI, px internamente (1cm = 37.8px)
-- Sangrado: 3mm = ~11px
-- CSS siempre en archivo separado (.css por componente)
-- Precios en pesos argentinos sin decimales
+## Important rules
+- ALWAYS use CSS variables from globals.css for colors and typography
+- Canvas components use 'use client' (Fabric.js does not run on the server)
+- Measurements shown in CM in the UI, pixels used internally (1cm = 37.8px)
+- Bleed: 3mm = ~11px
+- CSS always in a separate file (.css per component)
+- Prices in Argentine pesos with no decimals
 
-## Próximos pasos
-1. Crear src/app/config/bookSizes.ts
-2. Crear src/app/config/layouts.ts
-3. Crear src/app/components/Canvas/fabricHelpers.ts
-4. Crear src/app/components/Canvas/Canvas.tsx
-5. Crear src/app/components/PhotoPanel/PhotoPanel.tsx
-6. Crear src/app/components/LayoutPanel/LayoutPanel.tsx
-7. Crear src/app/components/Toolbar/Toolbar.tsx
-8. Crear src/app/components/PageStrip/PageStrip.tsx
-9. Armar src/app/editor/page.tsx con todos los componentes
+## Next steps
+1. Create src/app/config/bookSizes.ts
+2. Create src/app/config/layouts.ts
+3. Create src/app/components/Canvas/fabricHelpers.ts
+4. Create src/app/components/Canvas/Canvas.tsx
+5. Create src/app/components/PhotoPanel/PhotoPanel.tsx
+6. Create src/app/components/LayoutPanel/LayoutPanel.tsx
+7. Create src/app/components/Toolbar/Toolbar.tsx
+8. Create src/app/components/PageStrip/PageStrip.tsx
+9. Assemble src/app/editor/page.tsx with all components

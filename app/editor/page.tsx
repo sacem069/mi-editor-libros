@@ -5,6 +5,8 @@ import * as fabric from 'fabric'
 import Topbar from '../components/Topbar/Topbar'
 import Canvas from '../components/Canvas/Canvas'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
+import LayoutPanel from '../components/LayoutPanel/LayoutPanel'
+import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 import './editor.css'
 
 export default function EditorPage() {
@@ -14,6 +16,9 @@ export default function EditorPage() {
   const [showBleed, setShowBleed] = useState(false)
   const [currentSpread, setCurrentSpread] = useState(0)
   const totalSpreads = 8 // placeholder
+
+  const [selectedPhotoCount, setSelectedPhotoCount] = useState(1)
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null)
 
   const leftCanvasRef  = useRef<fabric.Canvas | null>(null)
   const rightCanvasRef = useRef<fabric.Canvas | null>(null)
@@ -55,6 +60,13 @@ export default function EditorPage() {
     [],
   )
 
+  // ── Layout selection ──────────────────────────────────────────────────────
+
+  const handleLayoutSelect = useCallback((layout: Layout) => {
+    setSelectedLayoutId(layout.id)
+    // futuro: aplicar layout al canvas
+  }, [])
+
   return (
     <div className="editor-root">
       <Topbar />
@@ -73,6 +85,12 @@ export default function EditorPage() {
           onObjectSelected={handleObjectSelected}
           onCanvasReady={handleCanvasReady}
           onSpreadChange={setCurrentSpread}
+        />
+        <LayoutPanel
+          selectedPhotoCount={selectedPhotoCount}
+          selectedLayoutId={selectedLayoutId}
+          onPhotoCountChange={setSelectedPhotoCount}
+          onLayoutSelect={handleLayoutSelect}
         />
       </div>
     </div>
