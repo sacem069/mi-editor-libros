@@ -23,10 +23,10 @@ function LayoutThumbnail({ layout }: { layout: Layout }) {
           key={i}
           className="layout-thumb-frame"
           style={{
-            left:   `${frame.x}%`,
-            top:    `${frame.y}%`,
-            width:  `${frame.w}%`,
-            height: `${frame.h}%`,
+            left:   `${frame.x * 100}%`,
+            top:    `${frame.y * 100}%`,
+            width:  `${frame.w * 100}%`,
+            height: `${frame.h * 100}%`,
           }}
         />
       ))}

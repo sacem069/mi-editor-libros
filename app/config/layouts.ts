@@ -1,301 +1,333 @@
 // Layouts para el editor de fotolibros Zeika
-// Todos los valores en porcentajes (0–100) relativos a una sola página.
-// Sistema de márgenes: 3% en los bordes, 3% de gap entre frames.
-//
-// Columnas iguales:
-//   2 cols → x1=3 w=45 | gap4 | x2=52 w=45          (total 97%)
-//   3 cols → x1=3 w=29 | gap3 | x2=35 w=29 | gap3 | x3=67 w=30   (total 97%)
-//   4 cols → x1=3 w=21 | x2=27 w=21 | x3=51 w=21 | x4=75 w=22   (total 97%)
-//
-// Filas iguales: misma lógica en el eje Y.
+// Todos los valores son decimales (0–1) relativos al ancho/alto de la página.
+
+export const MARGIN = 0.06   // margen de página en los 4 lados
+export const GAP    = 0.025  // separación entre frames — siempre este valor
 
 export type Frame = {
-  x: number; // % desde el borde izquierdo
-  y: number; // % desde el borde superior
-  w: number; // % del ancho de la página
-  h: number; // % del alto de la página
+  x: number; // fracción del ancho desde el borde izquierdo  (0–1)
+  y: number; // fracción del alto desde el borde superior    (0–1)
+  w: number; // fracción del ancho de la página             (0–1)
+  h: number; // fracción del alto de la página              (0–1)
 };
 
 export type Layout = {
   id: string;
   nombre: string;
-  cantidadFotos: number;
+  photoCount: number;
   frames: Frame[];
 };
 
+// ─── Helpers internos ───────────────────────────────────────────────────────
+// Ancho / alto de N columnas o filas con margen y gap:
+//   cols(N) = (1 - MARGIN*2 - GAP*(N-1)) / N
+//   x(col)  = MARGIN + col * (cols(N) + GAP)
+//   (misma lógica para filas)
+
+const M  = MARGIN
+const G  = GAP
+const fw = (n: number) => (1 - M * 2 - G * (n - 1)) / n   // frame width  for N cols
+const fh = (n: number) => (1 - M * 2 - G * (n - 1)) / n   // frame height for N rows
+const cx = (col: number, n: number) => M + col * (fw(n) + G)
+const ry = (row: number, n: number) => M + row * (fh(n) + G)
+
 // ─── 1 FOTO ────────────────────────────────────────────────────────────────
 
-const layout_full: Layout = {
-  id: 'full',
+const layout_1_1: Layout = {
+  id: 'layout_1_1',
+  nombre: 'Cuadrada centrada',
+  photoCount: 1,
+  frames: [
+    { x: 0.2, y: 0.25, w: 0.6, h: 0.5 },
+  ],
+};
+
+const layout_1_2: Layout = {
+  id: 'layout_1_2',
+  nombre: 'Paisaje centrado',
+  photoCount: 1,
+  frames: [
+    { x: 0.1, y: 0.3, w: 0.8, h: 0.4 },
+  ],
+};
+
+const layout_1_3: Layout = {
+  id: 'layout_1_3',
   nombre: 'Página completa',
-  cantidadFotos: 1,
+  photoCount: 1,
   frames: [
-    { x: 0, y: 0, w: 100, h: 100 },
+    { x: 0, y: 0, w: 1, h: 1 },
   ],
 };
 
-const layout_centered: Layout = {
-  id: 'centered',
-  nombre: 'Centrada',
-  cantidadFotos: 1,
+const layout_1_4: Layout = {
+  id: 'layout_1_4',
+  nombre: 'Borde blanco',
+  photoCount: 1,
   frames: [
-    { x: 3, y: 3, w: 94, h: 94 },
-  ],
-};
-
-const layout_top: Layout = {
-  id: 'top',
-  nombre: 'Foto arriba',
-  cantidadFotos: 1,
-  // Foto ocupa el 65% superior; espacio para texto/caption debajo.
-  frames: [
-    { x: 3, y: 3, w: 94, h: 65 },
-  ],
-};
-
-const layout_panoramica: Layout = {
-  id: 'panoramica',
-  nombre: 'Panorámica',
-  cantidadFotos: 1,
-  // Franja horizontal centrada verticalmente (28%→72% = 44% alto).
-  frames: [
-    { x: 3, y: 28, w: 94, h: 44 },
+    { x: M, y: M, w: 1 - M * 2, h: 1 - M * 2 },
   ],
 };
 
 // ─── 2 FOTOS ───────────────────────────────────────────────────────────────
 
-const layout_2_vertical: Layout = {
-  id: '2-vertical',
-  nombre: 'Dos columnas',
-  cantidadFotos: 2,
+const layout_2_1: Layout = {
+  id: 'layout_2_1',
+  nombre: 'Dos columnas retrato',
+  photoCount: 2,
+  // 2 cols × 1 row, portrait
   frames: [
-    { x: 3,  y: 3, w: 45, h: 94 },
-    { x: 52, y: 3, w: 45, h: 94 },
+    { x: cx(0, 2), y: M, w: fw(2), h: 1 - M * 2 },
+    { x: cx(1, 2), y: M, w: fw(2), h: 1 - M * 2 },
   ],
 };
 
-const layout_2_horizontal: Layout = {
-  id: '2-horizontal',
-  nombre: 'Dos filas',
-  cantidadFotos: 2,
+const layout_2_2: Layout = {
+  id: 'layout_2_2',
+  nombre: 'Dos filas paisaje',
+  photoCount: 2,
+  // 1 col × 2 rows, landscape
   frames: [
-    { x: 3, y: 3,  w: 94, h: 45 },
-    { x: 3, y: 52, w: 94, h: 45 },
+    { x: M, y: ry(0, 2), w: 1 - M * 2, h: fh(2) },
+    { x: M, y: ry(1, 2), w: 1 - M * 2, h: fh(2) },
   ],
 };
 
-const layout_2_grande_chica: Layout = {
-  id: '2-grande-chica',
-  nombre: 'Grande arriba',
-  cantidadFotos: 2,
-  // Grande: 63% del alto. Chica: 28%.
-  frames: [
-    { x: 3, y: 3,  w: 94, h: 63 },
-    { x: 3, y: 69, w: 94, h: 28 },
-  ],
+const layout_2_3: Layout = {
+  id: 'layout_2_3',
+  nombre: 'Dos filas completas',
+  photoCount: 2,
+  // Full bleed, only GAP between rows
+  frames: (() => {
+    const h = (1 - G) / 2
+    return [
+      { x: 0, y: 0,     w: 1, h },
+      { x: 0, y: h + G, w: 1, h },
+    ]
+  })(),
 };
 
-const layout_2_chica_grande: Layout = {
-  id: '2-chica-grande',
-  nombre: 'Grande abajo',
-  cantidadFotos: 2,
-  // Chica: 28% del alto. Grande: 63%.
+const layout_2_4: Layout = {
+  id: 'layout_2_4',
+  nombre: 'Dos filas con margen',
+  photoCount: 2,
+  // Full width within margin, 2 equal rows
   frames: [
-    { x: 3, y: 3,  w: 94, h: 28 },
-    { x: 3, y: 34, w: 94, h: 63 },
+    { x: M, y: ry(0, 2), w: 1 - M * 2, h: fh(2) },
+    { x: M, y: ry(1, 2), w: 1 - M * 2, h: fh(2) },
   ],
 };
 
 // ─── 3 FOTOS ───────────────────────────────────────────────────────────────
 
-const layout_3_columnas: Layout = {
-  id: '3-columnas',
-  nombre: 'Tres columnas',
-  cantidadFotos: 3,
-  frames: [
-    { x: 3,  y: 3, w: 29, h: 94 },
-    { x: 35, y: 3, w: 29, h: 94 },
-    { x: 67, y: 3, w: 30, h: 94 },
-  ],
-};
-
-const layout_3_top_2bottom: Layout = {
-  id: '3-top-2bottom',
+const layout_3_1: Layout = {
+  id: 'layout_3_1',
   nombre: 'Grande arriba, dos abajo',
-  cantidadFotos: 3,
-  // Grande: 56% del alto. Dos abajo: 35%.
-  frames: [
-    { x: 3,  y: 3,  w: 94, h: 56 },
-    { x: 3,  y: 62, w: 45, h: 35 },
-    { x: 52, y: 62, w: 45, h: 35 },
-  ],
+  photoCount: 3,
+  frames: (() => {
+    const available = 1 - M * 2 - G
+    const topH = available * 0.55
+    const botH = available * 0.45
+    const botW = fw(2)
+    return [
+      { x: M,         y: M,             w: 1 - M * 2, h: topH },
+      { x: cx(0, 2),  y: M + topH + G,  w: botW,      h: botH },
+      { x: cx(1, 2),  y: M + topH + G,  w: botW,      h: botH },
+    ]
+  })(),
 };
 
-const layout_3_2top_bottom: Layout = {
-  id: '3-2top-bottom',
+const layout_3_2: Layout = {
+  id: 'layout_3_2',
   nombre: 'Dos arriba, grande abajo',
-  cantidadFotos: 3,
-  // Dos arriba: 35%. Grande: 56%.
+  photoCount: 3,
+  // Full bleed: 2 cols top + 1 full-width bottom
+  frames: (() => {
+    const available = 1 - G
+    const topH = available * 0.45
+    const botH = available * 0.55
+    const colW = (1 - G) / 2
+    return [
+      { x: 0,         y: 0,         w: colW, h: topH },
+      { x: colW + G,  y: 0,         w: colW, h: topH },
+      { x: 0,         y: topH + G,  w: 1,    h: botH },
+    ]
+  })(),
+};
+
+const layout_3_3: Layout = {
+  id: 'layout_3_3',
+  nombre: 'Tres filas centradas',
+  photoCount: 3,
+  // 1 col × 3 rows within margin
   frames: [
-    { x: 3,  y: 3,  w: 45, h: 35 },
-    { x: 52, y: 3,  w: 45, h: 35 },
-    { x: 3,  y: 41, w: 94, h: 56 },
+    { x: M, y: ry(0, 3), w: 1 - M * 2, h: fh(3) },
+    { x: M, y: ry(1, 3), w: 1 - M * 2, h: fh(3) },
+    { x: M, y: ry(2, 3), w: 1 - M * 2, h: fh(3) },
   ],
 };
 
-const layout_3_izq_2der: Layout = {
-  id: '3-izq-2der',
-  nombre: 'Grande izquierda, dos derecha',
-  cantidadFotos: 3,
-  // Grande izq: 55% del ancho. Derecha: 36%, dos filas iguales.
-  frames: [
-    { x: 3,  y: 3,  w: 55, h: 94 },
-    { x: 61, y: 3,  w: 36, h: 45 },
-    { x: 61, y: 52, w: 36, h: 45 },
-  ],
+const layout_3_4: Layout = {
+  id: 'layout_3_4',
+  nombre: 'Tres columnas centradas',
+  photoCount: 3,
+  // 3 cols × 1 row, vertically centered
+  frames: (() => {
+    const frameH = 0.4
+    const y = (1 - frameH) / 2
+    return [
+      { x: cx(0, 3), y, w: fw(3), h: frameH },
+      { x: cx(1, 3), y, w: fw(3), h: frameH },
+      { x: cx(2, 3), y, w: fw(3), h: frameH },
+    ]
+  })(),
 };
 
 // ─── 4 FOTOS ───────────────────────────────────────────────────────────────
 
-const layout_4_grid: Layout = {
-  id: '4-grid',
-  nombre: 'Grilla 2×2',
-  cantidadFotos: 4,
+const layout_4_1: Layout = {
+  id: 'layout_4_1',
+  nombre: 'Grilla 2×2 con margen',
+  photoCount: 4,
   frames: [
-    { x: 3,  y: 3,  w: 45, h: 45 },   // top-left
-    { x: 52, y: 3,  w: 45, h: 45 },   // top-right
-    { x: 3,  y: 52, w: 45, h: 45 },   // bottom-left
-    { x: 52, y: 52, w: 45, h: 45 },   // bottom-right
+    { x: cx(0, 2), y: ry(0, 2), w: fw(2), h: fh(2) },
+    { x: cx(1, 2), y: ry(0, 2), w: fw(2), h: fh(2) },
+    { x: cx(0, 2), y: ry(1, 2), w: fw(2), h: fh(2) },
+    { x: cx(1, 2), y: ry(1, 2), w: fw(2), h: fh(2) },
   ],
 };
 
-const layout_4_hero_3: Layout = {
-  id: '4-hero-3',
-  nombre: 'Grande arriba, tres abajo',
-  cantidadFotos: 4,
-  // Grande: 52% del alto. Tres abajo: 39%.
-  frames: [
-    { x: 3,  y: 3,  w: 94, h: 52 },
-    { x: 3,  y: 58, w: 29, h: 39 },
-    { x: 35, y: 58, w: 29, h: 39 },
-    { x: 67, y: 58, w: 30, h: 39 },
-  ],
+const layout_4_2: Layout = {
+  id: 'layout_4_2',
+  nombre: 'Grilla 2×2 completa',
+  photoCount: 4,
+  // Full bleed 2×2
+  frames: (() => {
+    const s = (1 - G) / 2
+    return [
+      { x: 0,     y: 0,     w: s, h: s },
+      { x: s + G, y: 0,     w: s, h: s },
+      { x: 0,     y: s + G, w: s, h: s },
+      { x: s + G, y: s + G, w: s, h: s },
+    ]
+  })(),
 };
 
-const layout_4_3_hero: Layout = {
-  id: '4-3-hero',
-  nombre: 'Tres arriba, grande abajo',
-  cantidadFotos: 4,
-  // Tres arriba: 39%. Grande: 52%.
-  frames: [
-    { x: 3,  y: 3,  w: 29, h: 39 },
-    { x: 35, y: 3,  w: 29, h: 39 },
-    { x: 67, y: 3,  w: 30, h: 39 },
-    { x: 3,  y: 45, w: 94, h: 52 },
-  ],
+const layout_4_3: Layout = {
+  id: 'layout_4_3',
+  nombre: 'Grilla 2×2 paisaje centrada',
+  photoCount: 4,
+  // 2×2 landscape frames, vertically centered
+  frames: (() => {
+    const frameW = fw(2)
+    const frameH = frameW * 0.65
+    const startY = (1 - (frameH * 2 + G)) / 2
+    return [
+      { x: cx(0, 2), y: startY,            w: frameW, h: frameH },
+      { x: cx(1, 2), y: startY,            w: frameW, h: frameH },
+      { x: cx(0, 2), y: startY + frameH + G, w: frameW, h: frameH },
+      { x: cx(1, 2), y: startY + frameH + G, w: frameW, h: frameH },
+    ]
+  })(),
 };
 
-const layout_4_col_grid: Layout = {
-  id: '4-col-grid',
-  nombre: 'Dos columnas de dos',
-  cantidadFotos: 4,
-  // Mismo grid 2×2 pero ordenado por columna (izq arriba→abajo, der arriba→abajo).
-  frames: [
-    { x: 3,  y: 3,  w: 45, h: 45 },   // col izq, arriba
-    { x: 3,  y: 52, w: 45, h: 45 },   // col izq, abajo
-    { x: 52, y: 3,  w: 45, h: 45 },   // col der, arriba
-    { x: 52, y: 52, w: 45, h: 45 },   // col der, abajo
-  ],
+const layout_4_4: Layout = {
+  id: 'layout_4_4',
+  nombre: 'Grande izquierda, tres derecha',
+  photoCount: 4,
+  frames: (() => {
+    const available = 1 - M * 2 - G
+    const leftW     = available * 0.52
+    const rightW    = available * 0.48
+    const rightH    = fh(3)
+    const rx        = M + leftW + G
+    return [
+      { x: M,  y: M,            w: leftW,  h: 1 - M * 2 },
+      { x: rx, y: ry(0, 3),     w: rightW, h: rightH     },
+      { x: rx, y: ry(1, 3),     w: rightW, h: rightH     },
+      { x: rx, y: ry(2, 3),     w: rightW, h: rightH     },
+    ]
+  })(),
 };
 
 // ─── 5 FOTOS ───────────────────────────────────────────────────────────────
 
-const layout_5_hero_4: Layout = {
-  id: '5-hero-4',
-  nombre: 'Grande arriba, cuatro abajo',
-  cantidadFotos: 5,
-  // Grande: 52% del alto. Cuatro abajo: 39%.
-  // 4 cols: x=3,27,51,75 w=21,21,21,22
-  frames: [
-    { x: 3,  y: 3,  w: 94, h: 52 },
-    { x: 3,  y: 58, w: 21, h: 39 },
-    { x: 27, y: 58, w: 21, h: 39 },
-    { x: 51, y: 58, w: 21, h: 39 },
-    { x: 75, y: 58, w: 22, h: 39 },
-  ],
+const layout_5_1: Layout = {
+  id: 'layout_5_1',
+  nombre: 'Grilla 2×2 + franja inferior',
+  photoCount: 5,
+  // 2×2 grid + 1 thin wide frame at bottom
+  frames: (() => {
+    const colW     = fw(2)
+    const available = 1 - M * 2 - G * 2  // vertical space for 3 rows
+    const topH     = available * 0.42
+    const midH     = available * 0.42
+    const botH     = available * 0.16
+    return [
+      { x: cx(0, 2), y: M,                        w: colW,      h: topH },
+      { x: cx(1, 2), y: M,                        w: colW,      h: topH },
+      { x: cx(0, 2), y: M + topH + G,             w: colW,      h: midH },
+      { x: cx(1, 2), y: M + topH + G,             w: colW,      h: midH },
+      { x: M,        y: M + topH + midH + G * 2,  w: 1 - M * 2, h: botH },
+    ]
+  })(),
 };
 
-const layout_5_mosaico: Layout = {
-  id: '5-mosaico',
-  nombre: 'Mosaico',
-  cantidadFotos: 5,
-  // Grande izq: 55% ancho. Cuadrícula 2×2 derecha: x=61, cols w=16/17, filas h=45.
-  frames: [
-    { x: 3,  y: 3,  w: 55, h: 94 },
-    { x: 61, y: 3,  w: 16, h: 45 },
-    { x: 80, y: 3,  w: 17, h: 45 },
-    { x: 61, y: 52, w: 16, h: 45 },
-    { x: 80, y: 52, w: 17, h: 45 },
-  ],
+const layout_5_2: Layout = {
+  id: 'layout_5_2',
+  nombre: 'Dos arriba, tres abajo completo',
+  photoCount: 5,
+  // Full bleed: 2 cols top + 3 cols bottom
+  frames: (() => {
+    const topH = (1 - G) * 0.5
+    const botH = (1 - G) * 0.5
+    const topW = (1 - G) / 2
+    const botW = (1 - G * 2) / 3
+    return [
+      { x: 0,            y: 0,        w: topW, h: topH },
+      { x: topW + G,     y: 0,        w: topW, h: topH },
+      { x: 0,            y: topH + G, w: botW, h: botH },
+      { x: botW + G,     y: topH + G, w: botW, h: botH },
+      { x: botW * 2 + G * 2, y: topH + G, w: botW, h: botH },
+    ]
+  })(),
 };
 
-const layout_5_2top_3bot: Layout = {
-  id: '5-2top-3bot',
-  nombre: 'Dos arriba, tres abajo',
-  cantidadFotos: 5,
-  frames: [
-    { x: 3,  y: 3,  w: 45, h: 45 },
-    { x: 52, y: 3,  w: 45, h: 45 },
-    { x: 3,  y: 52, w: 29, h: 45 },
-    { x: 35, y: 52, w: 29, h: 45 },
-    { x: 67, y: 52, w: 30, h: 45 },
-  ],
-};
-
-const layout_5_3top_2bot: Layout = {
-  id: '5-3top-2bot',
-  nombre: 'Tres arriba, dos abajo',
-  cantidadFotos: 5,
-  frames: [
-    { x: 3,  y: 3,  w: 29, h: 45 },
-    { x: 35, y: 3,  w: 29, h: 45 },
-    { x: 67, y: 3,  w: 30, h: 45 },
-    { x: 3,  y: 52, w: 45, h: 45 },
-    { x: 52, y: 52, w: 45, h: 45 },
-  ],
+const layout_5_3: Layout = {
+  id: 'layout_5_3',
+  nombre: 'Dos arriba, tres abajo con margen',
+  photoCount: 5,
+  frames: (() => {
+    const topW     = fw(2)
+    const available = 1 - M * 2 - G  // vertical space for 2 rows
+    const topH     = available * 0.45
+    const botH     = available * 0.55
+    const botW     = fw(3)
+    return [
+      { x: cx(0, 2), y: M,            w: topW, h: topH },
+      { x: cx(1, 2), y: M,            w: topW, h: topH },
+      { x: cx(0, 3), y: M + topH + G, w: botW, h: botH },
+      { x: cx(1, 3), y: M + topH + G, w: botW, h: botH },
+      { x: cx(2, 3), y: M + topH + G, w: botW, h: botH },
+    ]
+  })(),
 };
 
 // ─── Array principal ────────────────────────────────────────────────────────
 
 export const LAYOUTS: Layout[] = [
   // 1 foto
-  layout_full,
-  layout_centered,
-  layout_top,
-  layout_panoramica,
+  layout_1_1, layout_1_2, layout_1_3, layout_1_4,
   // 2 fotos
-  layout_2_vertical,
-  layout_2_horizontal,
-  layout_2_grande_chica,
-  layout_2_chica_grande,
+  layout_2_1, layout_2_2, layout_2_3, layout_2_4,
   // 3 fotos
-  layout_3_columnas,
-  layout_3_top_2bottom,
-  layout_3_2top_bottom,
-  layout_3_izq_2der,
+  layout_3_1, layout_3_2, layout_3_3, layout_3_4,
   // 4 fotos
-  layout_4_grid,
-  layout_4_hero_3,
-  layout_4_3_hero,
-  layout_4_col_grid,
+  layout_4_1, layout_4_2, layout_4_3, layout_4_4,
   // 5 fotos
-  layout_5_hero_4,
-  layout_5_mosaico,
-  layout_5_2top_3bot,
-  layout_5_3top_2bot,
+  layout_5_1, layout_5_2, layout_5_3,
 ];
 
 export function getLayoutsByCantidad(cantidad: number): Layout[] {
-  return LAYOUTS.filter((l) => l.cantidadFotos === cantidad);
+  return LAYOUTS.filter((l) => l.photoCount === cantidad);
 }
