@@ -5,15 +5,17 @@ import { CirclePlus, ListFilter, Check } from 'lucide-react'
 import './PhotoPanel.css'
 
 export type Photo = {
-  id: string
-  src: string
-  name: string
+  id:     string
+  src:    string   // Cloudinary URL
+  name:   string
+  width:  number
+  height: number
 }
 
 interface PhotoPanelProps {
-  photos: Photo[]
+  photos:       Photo[]
   usedPhotoIds: Set<string>
-  onUpload: (files: File[]) => void
+  onUpload:     (photos: Photo[]) => void
   onPhotoClick: (photo: Photo) => void
 }
 
@@ -29,9 +31,10 @@ export default function PhotoPanel({
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const filterWrapRef = useRef<HTMLDivElement>(null)
 
-  const [filterOpen,  setFilterOpen]  = useState(false)
-  const [sortBy,      setSortBy]      = useState<SortBy>('fecha')
-  const [showFilter,  setShowFilter]  = useState<ShowFilter>('todas')
+  const [filterOpen,    setFilterOpen]    = useState(false)
+  const [sortBy,        setSortBy]        = useState<SortBy>('fecha')
+  const [showFilter,    setShowFilter]    = useState<ShowFilter>('todas')
+  const [uploadingIds,  setUploadingIds]  = useState<Set<string>>(new Set())
 
   // ── Close filter panel on outside click ──────────────────────────────────
 
@@ -49,18 +52,60 @@ export default function PhotoPanel({
   // ── File upload ───────────────────────────────────────────────────────────
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? [])
       if (files.length === 0) return
-      onUpload(files)
       e.target.value = ''
+
+      // Create placeholder IDs so we can show spinners immediately
+      const placeholders = files.map((file) => ({
+        tempId: crypto.randomUUID(),
+        file,
+      }))
+
+      setUploadingIds((prev) => {
+        const next = new Set(prev)
+        placeholders.forEach(({ tempId }) => next.add(tempId))
+        return next
+      })
+
+      const uploaded = await Promise.all(
+        placeholders.map(async ({ tempId, file }) => {
+          const form = new FormData()
+          form.append('file', file)
+
+          const res  = await fetch('/api/upload', { method: 'POST', body: form })
+          const data = await res.json() as {
+            url:      string
+            publicId: string
+            width:    number
+            height:   number
+          }
+
+          setUploadingIds((prev) => {
+            const next = new Set(prev)
+            next.delete(tempId)
+            return next
+          })
+
+          return {
+            id:     tempId,
+            src:    data.url,
+            name:   file.name,
+            width:  data.width,
+            height: data.height,
+          } satisfies Photo
+        }),
+      )
+
+      onUpload(uploaded)
     },
     [onUpload],
   )
 
   const openFilePicker = () => fileInputRef.current?.click()
 
-  // ── Drag start: pone el src de la foto en el dataTransfer ─────────────────
+  // ── Drag start ────────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, photo: Photo) => {
@@ -79,7 +124,7 @@ export default function PhotoPanel({
       return true
     })
     .sort((a, b) =>
-      sortBy === 'nombre' ? a.name.localeCompare(b.name) : 0
+      sortBy === 'nombre' ? a.name.localeCompare(b.name) : 0,
     )
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -105,7 +150,6 @@ export default function PhotoPanel({
 
           {filterOpen && (
             <div className="photo-filter-panel">
-              {/* Ordenar por */}
               <p className="photo-filter-heading">Ordenar por</p>
               <div className="photo-filter-underline" />
               <button
@@ -121,7 +165,6 @@ export default function PhotoPanel({
                 Nombre
               </button>
 
-              {/* Mostrar/Ocultar */}
               <p className="photo-filter-heading photo-filter-heading--spaced">Mostrar/Ocultar</p>
               <div className="photo-filter-underline" />
               <button
@@ -150,7 +193,7 @@ export default function PhotoPanel({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         multiple
         className="photo-file-input"
         onChange={handleFileChange}
@@ -171,6 +214,13 @@ export default function PhotoPanel({
 
       {/* ── Grid de fotos ── */}
       <div className="photo-grid">
+        {/* Uploading placeholders */}
+        {Array.from(uploadingIds).map((id) => (
+          <div key={id} className="photo-thumb photo-thumb--uploading">
+            <div className="photo-thumb-spinner" />
+          </div>
+        ))}
+
         {visiblePhotos.map((photo) => {
           const isUsed = usedPhotoIds.has(photo.id)
           return (

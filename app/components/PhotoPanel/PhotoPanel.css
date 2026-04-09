@@ -221,6 +221,40 @@
   pointer-events: none; /* evita interferir con el drag */
 }
 
+/* ─── Uploading placeholder + spinner ───────────────────────────────────────── */
+
+.photo-thumb--uploading {
+  cursor: default;
+  pointer-events: none;
+  border-color: transparent;
+}
+
+.photo-thumb--uploading:hover {
+  border-color: transparent;
+}
+
+.photo-thumb-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-thumb-spinner::after {
+  content: '';
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(82, 142, 214, 0.3);
+  border-top-color: var(--color-blue);
+  border-radius: 50%;
+  animation: photo-spin 0.7s linear infinite;
+}
+
+@keyframes photo-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Checkmark de "foto usada" ──────────────────────────────────────────────── */
 
 .photo-thumb-used {

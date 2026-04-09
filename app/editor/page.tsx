@@ -117,18 +117,8 @@ export default function EditorPage() {
   )
 
   // ── Photo upload ───────────────────────────────────────────────────────────
-  const handlePhotoUpload = useCallback((files: File[]) => {
-    files.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const src = e.target?.result as string
-        setPhotos((prev) => [
-          ...prev,
-          { id: crypto.randomUUID(), src, name: file.name },
-        ])
-      }
-      reader.readAsDataURL(file)
-    })
+  const handlePhotoUpload = useCallback((uploaded: Photo[]) => {
+    setPhotos((prev) => [...prev, ...uploaded])
   }, [])
 
   // ── Photo click: place in first empty frame on active spread ───────────────
