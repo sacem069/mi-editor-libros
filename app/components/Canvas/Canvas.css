@@ -68,6 +68,16 @@
   border: 1px solid #000;
   background: #ffffff;
   line-height: 0;
+  transition: border-color 0.1s;
+}
+
+.canvas-page-wrap--active {
+  border-color: #528ED6;
+}
+
+.canvas-page-wrap--drag-over {
+  border-color: #528ED6;
+  outline: 1px solid #528ED6;
 }
 
 .canvas-bleed-overlay {

@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import * as fabric from 'fabric'
 
 import Topbar      from '../components/Topbar/Topbar'
 import Toolbar     from '../components/Toolbar/Toolbar'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
-import Canvas      from '../components/Canvas/Canvas'
+// Canvas uses Fabric.js (browser-only). Dynamic import with ssr:false prevents
+// Next.js from attempting to server-render it, eliminating all hydration errors.
+const Canvas = dynamic(() => import('../components/Canvas/Canvas'), { ssr: false })
 import LayoutPanel from '../components/LayoutPanel/LayoutPanel'
 import PageStrip   from '../components/PageStrip/PageStrip'
 import type { Layout } from '../components/LayoutPanel/LayoutPanel'
@@ -36,8 +39,8 @@ export default function EditorPage() {
 
   // ── Book / navigation ──────────────────────────────────────────────────────
   const [currentSpread,       setCurrentSpread]       = useState(0)
-  const [totalContentSpreads, setTotalContentSpreads] = useState(13) // 13 spreads = 26 variable pages (02–27)
-  const totalSpreads = totalContentSpreads + 3 // cover + inside + content + outside
+  const [totalContentSpreads, setTotalContentSpreads] = useState(13)
+  const totalSpreads = totalContentSpreads + 3
 
   // ── Layout panel ───────────────────────────────────────────────────────────
   const [selectedLayoutId,   setSelectedLayoutId]   = useState<string | null>(null)
@@ -57,11 +60,23 @@ export default function EditorPage() {
   const fabricLeft  = useRef<fabric.Canvas | null>(null)
   const fabricRight = useRef<fabric.Canvas | null>(null)
 
-  // ── Spread persistence ─────────────────────────────────────────────────────
-  const saveTimer        = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentSpreadRef = useRef(0)   // mirror for use inside callbacks
+  // ── Active page (last clicked page in Canvas) ──────────────────────────────
+  const activePageRef = useRef<'left' | 'right'>('left')
 
-  // ── Push a snapshot to history ─────────────────────────────────────────────
+  // ── In-memory spread persistence (survives navigation within the session) ──
+  // Keyed by spread index. Saved immediately on every canvas change — no debounce.
+  const spreadsData      = useRef<Record<number, SpreadSnapshot>>({})
+  const currentSpreadRef = useRef(0)
+  // Guard: while deserializing (restoring a spread), suppress auto-saves so that
+  // Fabric object:added/removed events fired mid-restore don't overwrite the
+  // target spread's saved data with partial canvas state.
+  const isDeserializing  = useRef(false)
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const getActiveFabric   = () => activePageRef.current === 'right' ? fabricRight.current : fabricLeft.current
+  const getInactiveFabric = () => activePageRef.current === 'right' ? fabricLeft.current  : fabricRight.current
+
+  // ── Push a snapshot to undo history ───────────────────────────────────────
   const pushHistory = useCallback(() => {
     const lc = fabricLeft.current
     const rc = fabricRight.current
@@ -72,36 +87,45 @@ export default function EditorPage() {
       right: serializePage(rc, PAGE_W, PAGE_H),
     })
 
-    // Truncate any redo branch, then append
-    history.current   = [...history.current.slice(0, historyIndex.current + 1), snapshot]
+    history.current      = [...history.current.slice(0, historyIndex.current + 1), snapshot]
     historyIndex.current = history.current.length - 1
 
     setCanUndo(historyIndex.current > 0)
     setCanRedo(false)
   }, [])
 
-  // ── Save current spread to localStorage (debounced 1 s) ───────────────────
+  // ── Save current spread immediately (no debounce) ─────────────────────────
+  // Called on every canvas mutation so navigation always has fresh data.
+  // Suppressed while deserializing to prevent mid-restore events from writing
+  // partial canvas state into spreadsData.
   const saveCurrentSpread = useCallback(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      const lc = fabricLeft.current
-      const rc = fabricRight.current
-      if (!lc || !rc) return
+    if (isDeserializing.current) return
+    const lc = fabricLeft.current
+    const rc = fabricRight.current
+    if (!lc || !rc) return
 
-      const data: SpreadSnapshot = {
-        left:  serializePage(lc, PAGE_W, PAGE_H),
-        right: serializePage(rc, PAGE_W, PAGE_H),
-      }
-      localStorage.setItem(`zeika-spread-${currentSpreadRef.current}`, JSON.stringify(data))
-      pushHistory()
-    }, 1000)
+    spreadsData.current[currentSpreadRef.current] = {
+      left:  serializePage(lc, PAGE_W, PAGE_H),
+      right: serializePage(rc, PAGE_W, PAGE_H),
+    }
+    pushHistory()
   }, [pushHistory])
 
-  // ── Canvas ready: wire up fabric instances and change listeners ────────────
+  // ── Canvas ready: restore saved state, then wire change listeners ───────────
   const handleCanvasReady = useCallback(
-    (left: fabric.Canvas, right: fabric.Canvas) => {
+    async (left: fabric.Canvas, right: fabric.Canvas) => {
       fabricLeft.current  = left
       fabricRight.current = right
+
+      // Restore the current spread BEFORE registering change listeners.
+      // If we registered listeners first, every object:added event fired by
+      // deserializePage would call saveCurrentSpread and overwrite saved data
+      // with the partially-loaded canvas state.
+      const saved = spreadsData.current[currentSpreadRef.current]
+      if (saved) {
+        await deserializePage(left,  saved.left,  PAGE_W, PAGE_H)
+        await deserializePage(right, saved.right, PAGE_W, PAGE_H)
+      }
 
       const onChange = () => saveCurrentSpread()
       for (const fc of [left, right]) {
@@ -110,20 +134,24 @@ export default function EditorPage() {
         fc.on('object:removed',  onChange)
       }
 
-      // Seed history with the initial blank state
       pushHistory()
     },
     [saveCurrentSpread, pushHistory],
   )
+
+  // ── Active page change (fired by Canvas on mousedown) ─────────────────────
+  const handleActivePageChange = useCallback((page: 'left' | 'right') => {
+    activePageRef.current = page
+  }, [])
 
   // ── Photo upload ───────────────────────────────────────────────────────────
   const handlePhotoUpload = useCallback((uploaded: Photo[]) => {
     setPhotos((prev) => [...prev, ...uploaded])
   }, [])
 
-  // ── Photo click: place in first empty frame on active spread ───────────────
+  // ── Photo click: place in first empty frame, active page first ─────────────
   const handlePhotoClick = useCallback(async (photo: Photo) => {
-    for (const fc of [fabricLeft.current, fabricRight.current]) {
+    for (const fc of [getActiveFabric(), getInactiveFabric()]) {
       if (!fc) continue
       const emptyFrame = fc.getObjects().find((obj) => {
         const d = (obj as fabric.FabricObject & { data?: { type: string; isEmpty: boolean } }).data
@@ -137,24 +165,41 @@ export default function EditorPage() {
         return
       }
     }
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Photo dropped onto canvas frame (from drag) ────────────────────────────
+  const handlePhotoDrop = useCallback((photoId: string) => {
+    setUsedPhotoIds((prev) => new Set([...prev, photoId]))
+    saveCurrentSpread()
   }, [saveCurrentSpread])
 
-  // ── Layout select ──────────────────────────────────────────────────────────
+  // ── Layout select (panel click) → applies to active page ──────────────────
   const handleLayoutSelect = useCallback((layout: Layout) => {
-    const lc = fabricLeft.current
-    if (!lc) return
+    const fc = getActiveFabric()
+    if (!fc) return
     setSelectedLayoutId(layout.id)
-    applyLayout(lc, layout, PAGE_W, PAGE_H)
+    applyLayout(fc, layout, PAGE_W, PAGE_H)
+    saveCurrentSpread()
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Layout dropped onto a specific page in Canvas ─────────────────────────
+  const handleLayoutDropOnPage = useCallback((layoutId: string, page: 'left' | 'right') => {
+    const layout = LAYOUTS.find((l) => l.id === layoutId)
+    if (!layout) return
+    const fc = page === 'right' ? fabricRight.current : fabricLeft.current
+    if (!fc) return
+    setSelectedLayoutId(layoutId)
+    applyLayout(fc, layout, PAGE_W, PAGE_H)
     saveCurrentSpread()
   }, [saveCurrentSpread])
 
-  // ── Add text ───────────────────────────────────────────────────────────────
+  // ── Add text → active page ─────────────────────────────────────────────────
   const handleAddText = useCallback(() => {
-    const lc = fabricLeft.current
-    if (!lc) return
-    addTextBox(lc, PAGE_W, PAGE_H)
+    const fc = getActiveFabric()
+    if (!fc) return
+    addTextBox(fc, PAGE_W, PAGE_H)
     saveCurrentSpread()
-  }, [saveCurrentSpread])
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Undo ───────────────────────────────────────────────────────────────────
   const handleUndo = useCallback(async () => {
@@ -165,8 +210,13 @@ export default function EditorPage() {
     const rc = fabricRight.current
     if (!lc || !rc) return
 
-    await deserializePage(lc, snapshot.left,  PAGE_W, PAGE_H)
-    await deserializePage(rc, snapshot.right, PAGE_W, PAGE_H)
+    isDeserializing.current = true
+    try {
+      await deserializePage(lc, snapshot.left,  PAGE_W, PAGE_H)
+      await deserializePage(rc, snapshot.right, PAGE_W, PAGE_H)
+    } finally {
+      isDeserializing.current = false
+    }
 
     historyIndex.current = prevIdx
     setCanUndo(prevIdx > 0)
@@ -182,45 +232,61 @@ export default function EditorPage() {
     const rc = fabricRight.current
     if (!lc || !rc) return
 
-    await deserializePage(lc, snapshot.left,  PAGE_W, PAGE_H)
-    await deserializePage(rc, snapshot.right, PAGE_W, PAGE_H)
+    isDeserializing.current = true
+    try {
+      await deserializePage(lc, snapshot.left,  PAGE_W, PAGE_H)
+      await deserializePage(rc, snapshot.right, PAGE_W, PAGE_H)
+    } finally {
+      isDeserializing.current = false
+    }
 
     historyIndex.current = nextIdx
     setCanUndo(true)
     setCanRedo(nextIdx < history.current.length - 1)
   }, [])
 
-  // ── Spread select: save current, load new ─────────────────────────────────
+  // ── Spread select: save current → load new ────────────────────────────────
   const handleSpreadSelect = useCallback(async (newSpread: number) => {
     const lc = fabricLeft.current
     const rc = fabricRight.current
     if (!lc || !rc) return
 
-    // Flush save immediately (bypass debounce)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    const currentData: SpreadSnapshot = {
+    // 1. Save current spread BEFORE changing the index.
+    //    saveCurrentSpread reads currentSpreadRef, so it must still point to
+    //    the old spread here.
+    spreadsData.current[currentSpreadRef.current] = {
       left:  serializePage(lc, PAGE_W, PAGE_H),
       right: serializePage(rc, PAGE_W, PAGE_H),
     }
-    localStorage.setItem(`zeika-spread-${currentSpreadRef.current}`, JSON.stringify(currentData))
 
-    // Load new spread from localStorage or clear
-    const saved = localStorage.getItem(`zeika-spread-${newSpread}`)
-    if (saved) {
-      const data = JSON.parse(saved) as SpreadSnapshot
-      await deserializePage(lc, data.left,  PAGE_W, PAGE_H)
-      await deserializePage(rc, data.right, PAGE_W, PAGE_H)
-    } else {
-      lc.remove(...lc.getObjects())
-      rc.remove(...rc.getObjects())
-      lc.renderAll()
-      rc.renderAll()
-    }
-
+    // 2. Advance the index BEFORE deserializing the new spread.
+    //    deserializePage triggers Fabric object:added/removed events which call
+    //    saveCurrentSpread(). If currentSpreadRef still points to the old spread
+    //    at that point, those saves corrupt the old spread's data with
+    //    in-progress content from the new one.
     currentSpreadRef.current = newSpread
     setCurrentSpread(newSpread)
 
-    // Reset history for new spread
+    // 3. Restore the target spread, or clear if it has never been saved.
+    //    isDeserializing suppresses saveCurrentSpread during restore so Fabric
+    //    object:added/removed events don't overwrite spreadsData mid-load.
+    const saved = spreadsData.current[newSpread]
+    isDeserializing.current = true
+    try {
+      if (saved) {
+        await deserializePage(lc, saved.left,  PAGE_W, PAGE_H)
+        await deserializePage(rc, saved.right, PAGE_W, PAGE_H)
+      } else {
+        lc.remove(...lc.getObjects())
+        rc.remove(...rc.getObjects())
+        lc.renderAll()
+        rc.renderAll()
+      }
+    } finally {
+      isDeserializing.current = false
+    }
+
+    // Reset undo history for this spread
     history.current      = []
     historyIndex.current = -1
     setCanUndo(false)
@@ -237,27 +303,26 @@ export default function EditorPage() {
   const handleDeleteSpread = useCallback(async (spreadIndex: number) => {
     if (totalContentSpreads <= 13) return
 
-    // Shift localStorage entries: everything after spreadIndex moves down by 1
-    const lastIndex = totalContentSpreads + 2 // current last fixed spread index
+    // Shift in-memory entries: everything after spreadIndex moves down by 1
+    const lastIndex = totalContentSpreads + 2
     for (let j = spreadIndex; j <= lastIndex; j++) {
-      const next = localStorage.getItem(`zeika-spread-${j + 1}`)
-      if (next) localStorage.setItem(`zeika-spread-${j}`, next)
-      else      localStorage.removeItem(`zeika-spread-${j}`)
+      const next = spreadsData.current[j + 1]
+      if (next) spreadsData.current[j] = next
+      else      delete spreadsData.current[j]
     }
 
-    const newTotal = totalContentSpreads - 1
-    const maxSpread = newTotal + 2 // new last valid spread index
+    const newTotal  = totalContentSpreads - 1
+    const maxSpread = newTotal + 2
 
-    // Determine what spread to navigate to after deletion
     let target = currentSpreadRef.current
-    if (target > maxSpread)      target = maxSpread
+    if (target > maxSpread)                       target = maxSpread
     else if (target >= spreadIndex && target > 0) target = target - 1
 
     setTotalContentSpreads(newTotal)
     await handleSpreadSelect(target)
   }, [totalContentSpreads, handleSpreadSelect])
 
-  // ── Layout drop on PageStrip spread ───────────────────────────────────────
+  // ── Layout drop on PageStrip spread (always applies to left page) ─────────
   const handleLayoutDrop = useCallback(async (spreadIndex: number, layoutId: string) => {
     await handleSpreadSelect(spreadIndex)
     const layout = LAYOUTS.find((l) => l.id === layoutId)
@@ -269,14 +334,10 @@ export default function EditorPage() {
   }, [handleSpreadSelect, saveCurrentSpread])
 
   // ── Zoom ───────────────────────────────────────────────────────────────────
-  const handleZoomChange = useCallback((z: number) => {
-    setZoom(z)
-  }, [])
+  const handleZoomChange = useCallback((z: number) => setZoom(z), [])
 
   // ── Bleed ──────────────────────────────────────────────────────────────────
-  const handleToggleBleed = useCallback(() => {
-    setShowBleed((v) => !v)
-  }, [])
+  const handleToggleBleed = useCallback(() => setShowBleed((v) => !v), [])
 
   // ── Object selected (future: show properties) ─────────────────────────────
   const handleObjectSelected = useCallback((_obj: fabric.FabricObject | null) => {
@@ -316,6 +377,9 @@ export default function EditorPage() {
             onCanvasReady={handleCanvasReady}
             onSpreadChange={handleSpreadSelect}
             onZoomChange={handleZoomChange}
+            onActivePageChange={handleActivePageChange}
+            onLayoutDropOnPage={handleLayoutDropOnPage}
+            onPhotoDrop={handlePhotoDrop}
           />
 
           <PageStrip

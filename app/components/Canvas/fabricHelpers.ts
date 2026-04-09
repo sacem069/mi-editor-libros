@@ -276,13 +276,16 @@ export function serializePage(
     }
   }
 
-  return {
+  const result: PageData = {
     background: '#FFFFFF',
     pageW,
     pageH,
     frames,
     texts,
   }
+
+  console.log('SAVING PAGE:', JSON.stringify(result, null, 2))
+  return result
 }
 
 // ─── 7. deserializePage ─────────────────────────────────────────────────────
@@ -293,20 +296,26 @@ export async function deserializePage(
   pageW: number,
   pageH: number,
 ): Promise<void> {
+  console.log('RESTORING PAGE:', JSON.stringify(pageData, null, 2))
+
   canvas.remove(...canvas.getObjects())
 
   for (const sf of pageData.frames) {
     if (sf.isEmpty) {
       const rect = new fabric.Rect({
-        left: sf.frameX,
-        top: sf.frameY,
-        width: sf.frameW,
-        height: sf.frameH,
-        fill: '#F0EFEB',
-        stroke: '#528ED6',
+        left:    sf.frameX,
+        top:     sf.frameY,
+        width:   sf.frameW,
+        height:  sf.frameH,
+        originX: 'left',
+        originY: 'top',
+        fill:         '#F0EFEB',
+        stroke:       '#528ED6',
+        strokeWidth:  1,
         strokeDashArray: [5, 5],
+        strokeUniform:   true,
         selectable: false,
-        evented: true,
+        evented:    true,
       }) as fabric.Rect & { data: FrameData }
 
       rect.data = {

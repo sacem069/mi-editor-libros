@@ -31,6 +31,9 @@ interface CanvasProps {
   onCanvasReady: (left: fabric.Canvas, right: fabric.Canvas) => void
   onSpreadChange: (spread: number) => void
   onZoomChange: (zoom: number) => void
+  onActivePageChange: (page: 'left' | 'right') => void
+  onLayoutDropOnPage: (layoutId: string, page: 'left' | 'right') => void
+  onPhotoDrop: (photoId: string) => void
 }
 
 function spreadLabel(spread: number): { left: string; right: string } {
@@ -71,6 +74,9 @@ export default function Canvas({
   onCanvasReady,
   onSpreadChange,
   onZoomChange,
+  onActivePageChange,
+  onLayoutDropOnPage,
+  onPhotoDrop,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
@@ -78,20 +84,31 @@ export default function Canvas({
   const rightFabric = useRef<fabric.Canvas | null>(null)
   const outerRef    = useRef<HTMLDivElement>(null)
 
+  // ── Active page + drag-over visual state ─────────────────────────────────
+  const [activePage,   setActivePage]   = useState<'left' | 'right'>('left')
+  const [dragOverPage, setDragOverPage] = useState<'left' | 'right' | null>(null)
+
   // ── Selected textbox tracking (for delete button) ─────────────────────────
   type TextSel = { side: 'left' | 'right'; top: number; left: number; width: number } | null
   const [textSel,     setTextSel]     = useState<TextSel>(null)
   const [textEditing, setTextEditing] = useState(false)
 
   // Mirror latest callbacks/values into refs so effects stay stable
-  const onObjectSelectedRef = useRef(onObjectSelected)
-  const onCanvasReadyRef    = useRef(onCanvasReady)
-  const onZoomChangeRef     = useRef(onZoomChange)
-  const zoomRef             = useRef(zoom)
-  useEffect(() => { onObjectSelectedRef.current = onObjectSelected }, [onObjectSelected])
-  useEffect(() => { onCanvasReadyRef.current    = onCanvasReady    }, [onCanvasReady])
-  useEffect(() => { onZoomChangeRef.current     = onZoomChange     }, [onZoomChange])
-  useEffect(() => { zoomRef.current             = zoom             }, [zoom])
+  const onObjectSelectedRef   = useRef(onObjectSelected)
+  const onCanvasReadyRef      = useRef(onCanvasReady)
+  const onZoomChangeRef       = useRef(onZoomChange)
+  const onActivePageChangeRef = useRef(onActivePageChange)
+  const onLayoutDropOnPageRef = useRef(onLayoutDropOnPage)
+  const onPhotoDropRef        = useRef(onPhotoDrop)
+  const zoomRef               = useRef(zoom)
+
+  useEffect(() => { onObjectSelectedRef.current   = onObjectSelected   }, [onObjectSelected])
+  useEffect(() => { onCanvasReadyRef.current       = onCanvasReady       }, [onCanvasReady])
+  useEffect(() => { onZoomChangeRef.current        = onZoomChange        }, [onZoomChange])
+  useEffect(() => { onActivePageChangeRef.current  = onActivePageChange  }, [onActivePageChange])
+  useEffect(() => { onLayoutDropOnPageRef.current  = onLayoutDropOnPage  }, [onLayoutDropOnPage])
+  useEffect(() => { onPhotoDropRef.current         = onPhotoDrop         }, [onPhotoDrop])
+  useEffect(() => { zoomRef.current                = zoom               }, [zoom])
 
   // ── Initial zoom: hardcoded 49% ──────────────────────────────────────────
   useEffect(() => {
@@ -110,7 +127,6 @@ export default function Canvas({
       if (e.deltaMode === 1) dy *= 16   // LINE mode → px
       if (e.deltaMode === 2) dy *= 100  // PAGE mode → px
 
-      // ctrlKey signals a pinch gesture on Mac trackpad
       const sensitivity = e.ctrlKey ? 0.02 : 0.003
       const factor      = 1 - dy * sensitivity
       const next        = parseFloat(
@@ -123,7 +139,10 @@ export default function Canvas({
     return () => el.removeEventListener('wheel', handleWheel)
   }, [])
 
-  // ── Fabric initialisation (mount only) ────────────────────────────────────
+  // ── Fabric initialisation ─────────────────────────────────────────────────
+  // This component is loaded with { ssr: false } so it only ever runs in the
+  // browser. The <canvas> elements are unconditionally rendered, so refs are
+  // already populated when this effect fires on mount.
   useEffect(() => {
     if (!leftElRef.current || !rightElRef.current) return
 
@@ -147,6 +166,10 @@ export default function Canvas({
     }
 
     const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
+      fc.on('mouse:down', () => {
+        setActivePage(side)
+        onActivePageChangeRef.current(side)
+      })
       fc.on('selection:created', (e) => {
         onObjectSelectedRef.current(e.selected?.[0] ?? null)
         updateTextSel(e.selected?.[0], side)
@@ -174,7 +197,6 @@ export default function Canvas({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      // Don't interfere with text editing or regular inputs
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
@@ -196,29 +218,50 @@ export default function Canvas({
       lc.dispose()
       rc.dispose()
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Drag & drop ───────────────────────────────────────────────────────────
-  const makeDrop = useCallback(
-    (getFabric: () => fabric.Canvas | null) =>
-      async (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
-        const fc  = getFabric()
-        if (!fc) return
-        const src = e.dataTransfer.getData('text/plain')
-        if (!src) return
-        const rect  = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-        const x     = (e.clientX - rect.left) / zoom
-        const y     = (e.clientY - rect.top)  / zoom
-        const frame = findFrameAtPoint(fc, x, y)
-        if (frame) await dropPhotoOnFrame(fc, frame as fabric.Rect, src, PAGE_W, PAGE_H)
-      },
-    [zoom],
+  // ── Drag & drop (shared logic, page determined by call site) ─────────────
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>, page: 'left' | 'right') => {
+      e.preventDefault()
+      setDragOverPage(null)
+
+      // Layout drop takes priority over photo drop
+      const layoutId = e.dataTransfer.getData('application/zeika-layout')
+      if (layoutId) {
+        onLayoutDropOnPageRef.current(layoutId, page)
+        return
+      }
+
+      // Photo drop
+      const photoUrl = e.dataTransfer.getData('text/plain')
+      if (!photoUrl) return
+
+      const fc = page === 'left' ? leftFabric.current : rightFabric.current
+      if (!fc) return
+
+      const rect  = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+      const x     = (e.clientX - rect.left) / zoomRef.current
+      const y     = (e.clientY - rect.top)  / zoomRef.current
+      const frame = findFrameAtPoint(fc, x, y)
+      if (frame) {
+        await dropPhotoOnFrame(fc, frame as fabric.Rect, photoUrl, PAGE_W, PAGE_H)
+        const photoId = e.dataTransfer.getData('application/zeika-photo-id')
+        if (photoId) onPhotoDropRef.current(photoId)
+      }
+    },
+    [], // all mutable values accessed through stable refs
   )
 
-  const handleDropLeft  = makeDrop(() => leftFabric.current)
-  const handleDropRight = makeDrop(() => rightFabric.current)
-  const handleDragOver  = (e: React.DragEvent) => e.preventDefault()
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, page: 'left' | 'right') => {
+      e.preventDefault()
+      setDragOverPage(page)
+    },
+    [],
+  )
+
+  const handleDragLeave = useCallback(() => setDragOverPage(null), [])
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread)
@@ -244,7 +287,16 @@ export default function Canvas({
               {/* Left page */}
               <div className="canvas-page-col">
                 <div className="canvas-page-num">{leftLabel}</div>
-                <div className="canvas-page-wrap" onDrop={handleDropLeft} onDragOver={handleDragOver}>
+                <div
+                  className={[
+                    'canvas-page-wrap',
+                    activePage   === 'left' ? 'canvas-page-wrap--active'    : '',
+                    dragOverPage === 'left' ? 'canvas-page-wrap--drag-over' : '',
+                  ].filter(Boolean).join(' ')}
+                  onDrop={(e) => handleDrop(e, 'left')}
+                  onDragOver={(e) => handleDragOver(e, 'left')}
+                  onDragLeave={handleDragLeave}
+                >
                   <canvas ref={leftElRef} />
                   {showBleed && <BleedOverlay />}
                   {textSel?.side === 'left' && !textEditing && (
@@ -270,7 +322,16 @@ export default function Canvas({
               {/* Right page */}
               <div className="canvas-page-col">
                 <div className="canvas-page-num">{rightLabel}</div>
-                <div className="canvas-page-wrap" onDrop={handleDropRight} onDragOver={handleDragOver}>
+                <div
+                  className={[
+                    'canvas-page-wrap',
+                    activePage   === 'right' ? 'canvas-page-wrap--active'    : '',
+                    dragOverPage === 'right' ? 'canvas-page-wrap--drag-over' : '',
+                  ].filter(Boolean).join(' ')}
+                  onDrop={(e) => handleDrop(e, 'right')}
+                  onDragOver={(e) => handleDragOver(e, 'right')}
+                  onDragLeave={handleDragLeave}
+                >
                   <canvas ref={rightElRef} />
                   {showBleed && <BleedOverlay />}
                   {textSel?.side === 'right' && !textEditing && (
@@ -294,7 +355,7 @@ export default function Canvas({
 
             {/* Navigation */}
             <div className="canvas-nav">
-              <button className="canvas-nav-arrow" onClick={goLeft}  disabled={currentSpread === 0}              aria-label="Página anterior">{'<'}</button>
+              <button className="canvas-nav-arrow" onClick={goLeft}  disabled={currentSpread === 0}               aria-label="Página anterior">{'<'}</button>
               <span   className="canvas-nav-label">Página&nbsp;&nbsp;{leftLabel} - {rightLabel}</span>
               <button className="canvas-nav-arrow" onClick={goRight} disabled={currentSpread === totalSpreads - 1} aria-label="Página siguiente">{'>'}</button>
             </div>

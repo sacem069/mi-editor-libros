@@ -110,6 +110,7 @@ export default function PhotoPanel({
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, photo: Photo) => {
       e.dataTransfer.setData('text/plain', photo.src)
+      e.dataTransfer.setData('application/zeika-photo-id', photo.id)
       e.dataTransfer.effectAllowed = 'copy'
     },
     [],
