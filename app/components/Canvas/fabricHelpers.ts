@@ -12,11 +12,23 @@ type FrameData = {
   frameH: number
 }
 
+type PhotoData = {
+  type: 'photo'
+  frameX: number
+  frameY: number
+  frameW: number
+  frameH: number
+  naturalW: number  // intrinsic pixel width of the source image
+  naturalH: number  // intrinsic pixel height of the source image
+  cropX: number     // current horizontal crop offset in source pixels
+  cropY: number     // current vertical crop offset in source pixels
+}
+
 type TextData = {
   type: 'text'
 }
 
-type FabricObjectWithData = fabric.FabricObject & { data: FrameData | TextData }
+type FabricObjectWithData = fabric.FabricObject & { data: FrameData | PhotoData | TextData }
 
 // ─── Utilidades ─────────────────────────────────────────────────────────────
 
@@ -26,6 +38,10 @@ function pctToPx(pct: number, total: number): number {
 
 function isFrameObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
   return (obj as FabricObjectWithData).data?.type === 'frame'
+}
+
+function isPhotoObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
+  return (obj as FabricObjectWithData).data?.type === 'photo'
 }
 
 function isTextObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
@@ -50,15 +66,21 @@ export function createEmptyFrame(
     top:     frameY,
     width:   frameW,
     height:  frameH,
-    originX: 'left',   // explicit: left/top are the top-left corner
+    originX: 'left',
     originY: 'top',
     fill:         '#F0EFEB',
     stroke:       '#528ED6',
     strokeWidth:  1,
     strokeDashArray: [5, 5],
-    strokeUniform:   true,  // keeps stroke 1px regardless of scale
-    selectable: false,
-    evented:    true,
+    strokeUniform:   true,
+    selectable:    true,
+    evented:       true,
+    lockMovementX: true,
+    lockMovementY: true,
+    lockScalingX:  true,
+    lockScalingY:  true,
+    lockRotation:  true,
+    hoverCursor:   'default',
   }) as fabric.Rect & { data: FrameData }
 
   rect.data = {
@@ -74,6 +96,47 @@ export function createEmptyFrame(
   return rect
 }
 
+// ─── 1b. restoreEmptyFrame ───────────────────────────────────────────────────
+// Re-creates the dashed placeholder rect after a photo is deleted.
+
+export function restoreEmptyFrame(
+  canvas: fabric.Canvas,
+  data: { frameX: number; frameY: number; frameW: number; frameH: number },
+): void {
+  const rect = new fabric.Rect({
+    left:    data.frameX,
+    top:     data.frameY,
+    width:   data.frameW,
+    height:  data.frameH,
+    originX: 'left',
+    originY: 'top',
+    fill:         '#F0EFEB',
+    stroke:       '#528ED6',
+    strokeWidth:  1,
+    strokeDashArray: [5, 5],
+    strokeUniform:   true,
+    selectable:    true,
+    evented:       true,
+    lockMovementX: true,
+    lockMovementY: true,
+    lockScalingX:  true,
+    lockScalingY:  true,
+    lockRotation:  true,
+    hoverCursor:   'default',
+  }) as fabric.Rect & { data: FrameData }
+
+  rect.data = {
+    type:    'frame',
+    isEmpty: true,
+    frameX:  data.frameX,
+    frameY:  data.frameY,
+    frameW:  data.frameW,
+    frameH:  data.frameH,
+  }
+
+  canvas.add(rect)
+}
+
 // ─── 2. applyLayout ─────────────────────────────────────────────────────────
 
 export function applyLayout(
@@ -82,9 +145,9 @@ export function applyLayout(
   pageW: number,
   pageH: number,
 ): void {
-  // Elimina solo los frames (preserva textos y otros objetos)
-  const existingFrames = canvas.getObjects().filter(isFrameObj)
-  canvas.remove(...existingFrames)
+  // Remove empty frames and any placed photos; preserve text objects
+  const toRemove = canvas.getObjects().filter((o) => isFrameObj(o) || isPhotoObj(o))
+  canvas.remove(...toRemove)
 
   for (const frame of layout.frames) {
     createEmptyFrame(canvas, frame, pageW, pageH)
@@ -99,51 +162,79 @@ export async function dropPhotoOnFrame(
   canvas: fabric.Canvas,
   frameObj: fabric.Rect,
   photoSrc: string,
-  pageW: number,
-  pageH: number,
+  _pageW: number,
+  _pageH: number,
 ): Promise<void> {
-  const data = (frameObj as fabric.Rect & { data: FrameData }).data
-  const { frameX, frameY, frameW, frameH } = data
+  // Step 1: get true canvas-pixel coordinates BEFORE removing the frame.
+  // getBoundingRect() accounts for any Fabric transforms; reading .left/.top
+  // directly can give pre-transform values that cause misplacement.
+  const boundingRect = frameObj.getBoundingRect()
+  const frameX = boundingRect.left
+  const frameY = boundingRect.top
+  const frameW = boundingRect.width
+  const frameH = boundingRect.height
+  console.log('BOUNDING RECT:', boundingRect)
 
+  // Step 2: load image
   const img = await fabric.FabricImage.fromURL(photoSrc, {
     crossOrigin: 'anonymous',
   })
 
-  // object-fit: cover — escala mínima para cubrir el frame completamente
-  const scaleX = frameW / (img.width ?? 1)
-  const scaleY = frameH / (img.height ?? 1)
-  const scale = Math.max(scaleX, scaleY)
+  // Step 3: get actual pixel dimensions from the loaded image.
+  // img.width/height give the natural (intrinsic) pixel size, e.g. 4000×3000 for
+  // a phone photo. Fall back to getScaledWidth/Height if width/height is 0.
+  const imgW = img.width  || img.getScaledWidth()
+  const imgH = img.height || img.getScaledHeight()
+  console.log('IMAGE DIMENSIONS:', imgW, imgH)
+  console.log('FRAME DIMENSIONS:', frameW, frameH)
 
+  // Step 4: object-fit: cover — scale so the shorter axis fills the frame
+  const scale = Math.max(frameW / imgW, frameH / imgH)
+  console.log('SCALE:', scale)
+
+  // Centered crop: show the middle portion of the source image
+  const cropX = (imgW - frameW / scale) / 2
+  const cropY = (imgH - frameH / scale) / 2
+
+  // Virtual dims: rendered size = (frameW/scale * scale) = frameW × frameH exactly.
+  // No clipPath needed — the image fills the frame precisely.
   img.set({
-    left: frameX + frameW / 2,
-    top: frameY + frameH / 2,
     originX: 'center',
     originY: 'center',
-    scaleX: scale,
-    scaleY: scale,
+    left:    frameX + frameW / 2,
+    top:     frameY + frameH / 2,
+    scaleX:  scale,
+    scaleY:  scale,
+    width:   frameW / scale,
+    height:  frameH / scale,
+    cropX,
+    cropY,
+    selectable:        true,
+    evented:           true,
+    borderColor:       '#528ED6',
+    borderScaleFactor: 2,
   })
 
-  // ClipPath en coordenadas absolutas del canvas
-  const clipRect = new fabric.Rect({
-    left: frameX,
-    top: frameY,
-    width: frameW,
-    height: frameH,
-    absolutePositioned: true,
-  })
-  img.clipPath = clipRect
+  // All 8 resize handles visible
+  img.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
 
-  ;(img as unknown as FabricObjectWithData).data = {
-    type: 'frame',
-    isEmpty: false,
+  // Store bounding-rect geometry + natural dims for serialization / scaling handler
+  ;(img as unknown as fabric.FabricObject & { data: PhotoData }).data = {
+    type:    'photo',
     frameX,
     frameY,
     frameW,
     frameH,
+    naturalW: imgW,
+    naturalH: imgH,
+    cropX,
+    cropY,
   }
 
+  // Steps 6–8: remove frame AFTER coordinates are captured, then add image
   canvas.remove(frameObj)
   canvas.add(img)
+  canvas.setActiveObject(img)
   canvas.renderAll()
 }
 
@@ -213,6 +304,10 @@ type SerializedFrame = {
   scaleY?: number
   imgLeft?: number
   imgTop?: number
+  naturalW?: number
+  naturalH?: number
+  cropX?: number
+  cropY?: number
 }
 
 type SerializedText = {
@@ -246,21 +341,33 @@ export function serializePage(
 
     if (data?.type === 'frame') {
       const fd = data as FrameData
-      const sf: SerializedFrame = {
-        frameX: fd.frameX,
-        frameY: fd.frameY,
-        frameW: fd.frameW,
-        frameH: fd.frameH,
-        isEmpty: fd.isEmpty,
-      }
-      if (!fd.isEmpty && obj instanceof fabric.FabricImage) {
-        sf.photo = obj.getSrc()
-        sf.scaleX = obj.scaleX
-        sf.scaleY = obj.scaleY
-        sf.imgLeft = obj.left
-        sf.imgTop = obj.top
-      }
-      frames.push(sf)
+      frames.push({
+        frameX:  fd.frameX,
+        frameY:  fd.frameY,
+        frameW:  fd.frameW,
+        frameH:  fd.frameH,
+        isEmpty: true,
+      })
+    }
+
+    if (data?.type === 'photo' && obj instanceof fabric.FabricImage) {
+      const pd = data as PhotoData
+      frames.push({
+        frameX:   pd.frameX,
+        frameY:   pd.frameY,
+        frameW:   pd.frameW,
+        frameH:   pd.frameH,
+        isEmpty:  false,
+        photo:    obj.getSrc(),
+        scaleX:   obj.scaleX,
+        scaleY:   obj.scaleY,
+        imgLeft:  obj.left,
+        imgTop:   obj.top,
+        naturalW: pd.naturalW,
+        naturalH: pd.naturalH,
+        cropX:    obj.cropX,
+        cropY:    obj.cropY,
+      })
     }
 
     if (data?.type === 'text' && obj instanceof fabric.Textbox) {
@@ -314,8 +421,14 @@ export async function deserializePage(
         strokeWidth:  1,
         strokeDashArray: [5, 5],
         strokeUniform:   true,
-        selectable: false,
-        evented:    true,
+        selectable:    true,
+        evented:       true,
+        lockMovementX: true,
+        lockMovementY: true,
+        lockScalingX:  true,
+        lockScalingY:  true,
+        lockRotation:  true,
+        hoverCursor:   'default',
       }) as fabric.Rect & { data: FrameData }
 
       rect.data = {
@@ -332,31 +445,45 @@ export async function deserializePage(
         crossOrigin: 'anonymous',
       })
 
+      const scale = sf.scaleX ?? 1
+      const naturalW = sf.naturalW ?? (img.width  || img.getScaledWidth())
+      const naturalH = sf.naturalH ?? (img.height || img.getScaledHeight())
+
+      // Fallback: center-crop if no saved cropX/Y (legacy data)
+      const cropW = sf.frameW / scale
+      const cropH = sf.frameH / scale
+      const cropX = sf.cropX ?? (naturalW - cropW) / 2
+      const cropY = sf.cropY ?? (naturalH - cropH) / 2
+
       img.set({
-        left: sf.imgLeft ?? sf.frameX + sf.frameW / 2,
-        top: sf.imgTop ?? sf.frameY + sf.frameH / 2,
-        originX: 'center',
-        originY: 'center',
-        scaleX: sf.scaleX,
-        scaleY: sf.scaleY,
+        originX:           'center',
+        originY:           'center',
+        left:              sf.imgLeft ?? sf.frameX + sf.frameW / 2,
+        top:               sf.imgTop  ?? sf.frameY + sf.frameH / 2,
+        scaleX:            scale,
+        scaleY:            sf.scaleY ?? scale,
+        width:             cropW,
+        height:            cropH,
+        cropX,
+        cropY,
+        selectable:        true,
+        evented:           true,
+        borderColor:       '#528ED6',
+        borderScaleFactor: 2,
       })
 
-      const clipRect = new fabric.Rect({
-        left: sf.frameX,
-        top: sf.frameY,
-        width: sf.frameW,
-        height: sf.frameH,
-        absolutePositioned: true,
-      })
-      img.clipPath = clipRect
+      img.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
 
-      ;(img as unknown as FabricObjectWithData).data = {
-        type: 'frame',
-        isEmpty: false,
-        frameX: sf.frameX,
-        frameY: sf.frameY,
-        frameW: sf.frameW,
-        frameH: sf.frameH,
+      ;(img as unknown as fabric.FabricObject & { data: PhotoData }).data = {
+        type:    'photo',
+        frameX:  sf.frameX,
+        frameY:  sf.frameY,
+        frameW:  sf.frameW,
+        frameH:  sf.frameH,
+        naturalW,
+        naturalH,
+        cropX,
+        cropY,
       }
       canvas.add(img)
     }
