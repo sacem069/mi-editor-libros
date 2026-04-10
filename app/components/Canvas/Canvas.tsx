@@ -95,8 +95,15 @@ export default function Canvas({
   const [textSel,     setTextSel]     = useState<TextSel>(null)
   const [textEditing, setTextEditing] = useState(false)
 
-  // ── Pan mode indicator (shown as "Editando foto" label overlay) ───────────
-  const [panModeActive, setPanModeActive] = useState<'left' | 'right' | null>(null)
+  // ── Content-grabber (pan) state — refs avoid stale closure issues ────────
+  const isPanMode    = useRef(false)
+  const panTargetRef = useRef<fabric.FabricImage & { data: { imgLeft: number; imgTop: number } } | null>(null)
+  const panData      = useRef<{
+    img: fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
+    startPtr:  { x: number; y: number }
+    startLeft: number
+    startTop:  number
+  } | null>(null)
 
   // ── Per-canvas undo history ───────────────────────────────────────────────
   const lcHistoryRef = useRef<string[]>([])
@@ -213,105 +220,57 @@ export default function Canvas({
     // Track which canvas was last interacted with (for Ctrl+Z)
     let activeCanvas: fabric.Canvas = lc
 
-    // ── Pan mode ────────────────────────────────────────────────────────────
-    // STATE 1: idle — no visible border
-    // STATE 2: selected — solid blue border, all handles, drag moves whole frame
-    // STATE 3: pan mode (double-click) — dashed border, no handles,
-    //          image pans via direct left/top; clipPath stays fixed at frame
-    let panTarget:      (fabric.FabricObject & { data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number } }) | null = null
-    let isPanDragging   = false
-    let panStartX       = 0
-    let panStartY       = 0
-    let panStartImgLeft = 0
-    let panStartImgTop  = 0
-
-    const enterPanMode = (obj: fabric.FabricObject, side: 'left' | 'right') => {
-      panTarget = obj as typeof panTarget
-      obj.set({
-        selectable:      false,   // Fabric won't handle drags — we do it manually
-        hasControls:     false,
-        hoverCursor:     'grab',
-        borderColor:     '#528ED6',
-        borderDashArray: [6, 4],
-      })
-      setPanModeActive(side)
-      obj.canvas?.renderAll()
-    }
-
-    const exitPanMode = (saveHist = true) => {
-      if (panTarget) {
-        panTarget.set({
-          selectable:      true,
-          hasControls:     true,
-          hoverCursor:     'move',
-          borderColor:     '#528ED6',
-          borderDashArray: [],
-        })
-        if (saveHist) saveHistory(panTarget.canvas as fabric.Canvas)
-        panTarget.canvas?.renderAll()
-      }
-      panTarget     = null
-      isPanDragging = false
-      setPanModeActive(null)
-    }
-
     const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
       fc.on('mouse:down', (e) => {
         setActivePage(side)
         onActivePageChangeRef.current(side)
         activeCanvas = fc
 
-        if (panTarget && panTarget.canvas === fc) {
-          // In pan mode: check if clicking on the pan target
-          const pt = e.scenePoint
-          const obj = panTarget
-          const l = obj.left ?? 0
-          const t = obj.top  ?? 0
-          const w = (obj.width  ?? 0) * (obj.scaleX ?? 1)
-          const h = (obj.height ?? 0) * (obj.scaleY ?? 1)
-          // Hit-test against the image's current rendered bounding box
-          const hitLeft   = l - w / 2
-          const hitTop    = t - h / 2
-          const hitRight  = l + w / 2
-          const hitBottom = t + h / 2
-
-          if (pt.x >= hitLeft && pt.x <= hitRight && pt.y >= hitTop && pt.y <= hitBottom) {
-            isPanDragging   = true
-            panStartX       = pt.x
-            panStartY       = pt.y
-            panStartImgLeft = obj.left ?? 0
-            panStartImgTop  = obj.top  ?? 0
-            fc.setCursor('grabbing')
-          } else {
-            exitPanMode()
+        if (isPanMode.current && panTargetRef.current) {
+          const img  = panTargetRef.current
+          const rect = fc.upperCanvasEl.getBoundingClientRect()
+          const x    = (e.e as MouseEvent).clientX - rect.left
+          const y    = (e.e as MouseEvent).clientY - rect.top
+          panData.current = {
+            img,
+            startPtr:  { x, y },
+            startLeft: img.left ?? 0,
+            startTop:  img.top  ?? 0,
           }
+          fc.defaultCursor = 'grabbing'
+        } else if (isPanMode.current && !panTargetRef.current) {
+          // Clicked outside any pan target → exit
+          isPanMode.current    = false
+          panData.current      = null
+          panTargetRef.current = null
+          fc.selection         = true
+          fc.defaultCursor     = 'default'
         }
       })
 
-      // ── Mouse move: pan image position when in pan mode ──────────────────
+      // ── Mouse move: pan the photo inside its fixed clipPath ───────────────
       fc.on('mouse:move', (e) => {
-        if (!isPanDragging || !panTarget || panTarget.canvas !== fc) return
-        const pt = e.scenePoint
-        const dx = pt.x - panStartX
-        const dy = pt.y - panStartY
-        panTarget.set({
-          left: panStartImgLeft + dx,
-          top:  panStartImgTop  + dy,
-        })
-        fc.renderAll()
+        if (isPanMode.current && panData.current) {
+          const rect = fc.upperCanvasEl.getBoundingClientRect()
+          const x    = (e.e as MouseEvent).clientX - rect.left
+          const y    = (e.e as MouseEvent).clientY - rect.top
+          const { img, startPtr, startLeft, startTop } = panData.current
+          img.set({
+            left: startLeft + (x - startPtr.x),
+            top:  startTop  + (y - startPtr.y),
+          })
+          fc.renderAll()
+        }
       })
 
-      // ── Mouse up: stop panning ───────────────────────────────────────────
+      // ── Mouse up: persist panned position ────────────────────────────────
       fc.on('mouse:up', () => {
-        if (isPanDragging) {
-          // Save updated position into data for serialization
-          if (panTarget?.data) {
-            // No frameX/Y update needed here — frame position is the clipPath,
-            // which stays fixed. Only imgLeft/Top changes.
-          }
-          fc.setCursor('grab')
+        if (panData.current) {
+          panData.current.img.data.imgLeft = panData.current.img.left ?? 0
+          panData.current.img.data.imgTop  = panData.current.img.top  ?? 0
+          panData.current  = null
+          fc.defaultCursor = 'grab'
         }
-        isPanDragging = false
         setDragOverPage(null)
       })
 
@@ -418,15 +377,17 @@ export default function Canvas({
         )
       })
 
-      // ── Double-click: toggle pan mode ────────────────────────────────────
+      // ── Double-click: enter content (pan) mode ───────────────────────────
       fc.on('mouse:dblclick', (e) => {
-        const obj = e.target as fabric.FabricObject & { data?: { type: string } }
-        if (obj?.data?.type !== 'photo') return
-        if (panTarget === obj) {
-          exitPanMode()
-        } else {
-          if (panTarget) exitPanMode(false)
-          enterPanMode(obj, side)
+        const obj = fc.findTarget(e.e)
+        if (obj && (obj as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
+          isPanMode.current    = true   // FIRST — before any Fabric property changes
+          panTargetRef.current = obj as fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
+          panData.current      = null
+          fc.discardActiveObject()
+          fc.selection     = false
+          fc.defaultCursor = 'grab'
+          fc.renderAll()
         }
       })
 
@@ -446,7 +407,13 @@ export default function Canvas({
       to: fabric.Canvas,
       offsetX: number,
     ) => {
-      if (obj === panTarget) exitPanMode(false)
+      // Reset pan mode if the transferred object was the pan target
+      if (isPanMode.current) {
+        isPanMode.current    = false
+        panData.current      = null
+        panTargetRef.current = null
+        from.defaultCursor   = 'default'
+      }
 
       const cloned = await obj.clone()
       cloned.set({ left: (cloned.left ?? 0) + offsetX })
@@ -480,20 +447,146 @@ export default function Canvas({
 
     lc.on('object:modified', async (e) => {
       if ((e as unknown as { transform?: { action?: string } }).transform?.action !== 'drag') return
-      if (!e.target || e.target === panTarget) return
+      if (!e.target || isPanMode.current) return
       const cx = (e.target as fabric.FabricObject).getCenterPoint().x
       if (cx > PAGE_W) await transferToCanvas(e.target, lc, rc, -CANVAS_GAP)
     })
     rc.on('object:modified', async (e) => {
       if ((e as unknown as { transform?: { action?: string } }).transform?.action !== 'drag') return
-      if (!e.target || e.target === panTarget) return
+      if (!e.target || isPanMode.current) return
       const cx = (e.target as fabric.FabricObject).getCenterPoint().x
       if (cx < 0) await transferToCanvas(e.target, rc, lc, CANVAS_GAP)
     })
 
     onCanvasReadyRef.current(lc, rc)
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    // Clipboard stores plain serialized data — avoids Fabric clone() quirks in v7
+    type ClipboardEntry =
+      | { kind: 'photo'; src: string; left: number; top: number; scaleX: number; scaleY: number; width: number; height: number; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number }
+      | { kind: 'frame'; frameX: number; frameY: number; frameW: number; frameH: number }
+      | { kind: 'text';  text: string; left: number; top: number; width: number; fontSize: number; fontFamily: string; fill: string }
+    const clipboard = { current: null as ClipboardEntry | null }
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // ── Ctrl/Cmd + C: copy ───────────────────────────────────────────────
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        // Don't intercept while a textbox is being edited
+        if (activeCanvas.getActiveObject() instanceof fabric.Textbox &&
+            (activeCanvas.getActiveObject() as fabric.Textbox).isEditing) return
+        e.preventDefault()
+        const obj = activeCanvas.getActiveObject()
+        if (!obj) return
+
+        const d = (obj as fabric.FabricObject & { data?: Record<string, unknown> }).data
+
+        if (d?.type === 'photo' && obj instanceof fabric.FabricImage) {
+          clipboard.current = {
+            kind:     'photo',
+            src:      obj.getSrc(),
+            left:     obj.left   ?? 0,
+            top:      obj.top    ?? 0,
+            scaleX:   obj.scaleX ?? 1,
+            scaleY:   obj.scaleY ?? 1,
+            width:    obj.width  ?? 0,
+            height:   obj.height ?? 0,
+            frameX:   d.frameX   as number,
+            frameY:   d.frameY   as number,
+            frameW:   d.frameW   as number,
+            frameH:   d.frameH   as number,
+            naturalW: d.naturalW as number,
+            naturalH: d.naturalH as number,
+          }
+        } else if (d?.type === 'frame' && obj instanceof fabric.Rect) {
+          clipboard.current = {
+            kind:   'frame',
+            frameX: obj.left   ?? 0,
+            frameY: obj.top    ?? 0,
+            frameW: obj.width  ?? 0,
+            frameH: obj.height ?? 0,
+          }
+        } else if (obj instanceof fabric.Textbox) {
+          clipboard.current = {
+            kind:       'text',
+            text:       obj.text       ?? '',
+            left:       obj.left       ?? 0,
+            top:        obj.top        ?? 0,
+            width:      obj.width      ?? 200,
+            fontSize:   obj.fontSize   ?? 24,
+            fontFamily: obj.fontFamily ?? 'amandine',
+            fill:       (obj.fill as string) ?? '#191919',
+          }
+        }
+        return
+      }
+
+      // ── Ctrl/Cmd + V: paste ──────────────────────────────────────────────
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if (!clipboard.current) return
+        e.preventDefault()
+        const cb = clipboard.current
+        const OFF = 20
+
+        if (cb.kind === 'photo') {
+          const img = await fabric.FabricImage.fromURL(cb.src, { crossOrigin: 'anonymous' })
+          const fx = cb.frameX + OFF
+          const fy = cb.frameY + OFF
+          img.set({
+            originX:           'center',
+            originY:           'center',
+            left:              cb.left   + OFF,
+            top:               cb.top    + OFF,
+            scaleX:            cb.scaleX,
+            scaleY:            cb.scaleY,
+            width:             cb.width,
+            height:            cb.height,
+            selectable:        true,
+            evented:           true,
+            borderColor:       '#528ED6',
+            borderScaleFactor: 2,
+          })
+          img.clipPath = new fabric.Rect({
+            originX: 'left', originY: 'top',
+            left: fx, top: fy, width: cb.frameW, height: cb.frameH,
+            absolutePositioned: true,
+          })
+          img.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
+          ;(img as fabric.FabricObject & { data: Record<string, unknown> }).data = {
+            type: 'photo', frameX: fx, frameY: fy, frameW: cb.frameW, frameH: cb.frameH,
+            naturalW: cb.naturalW, naturalH: cb.naturalH,
+            imgLeft: cb.left + OFF, imgTop: cb.top + OFF,
+          }
+          activeCanvas.add(img)
+          activeCanvas.setActiveObject(img)
+
+        } else if (cb.kind === 'frame') {
+          restoreEmptyFrame(activeCanvas, {
+            frameX: cb.frameX + OFF,
+            frameY: cb.frameY + OFF,
+            frameW: cb.frameW,
+            frameH: cb.frameH,
+          })
+          const added = activeCanvas.getObjects().at(-1)
+          if (added) activeCanvas.setActiveObject(added)
+
+        } else if (cb.kind === 'text') {
+          const textbox = new fabric.Textbox(cb.text, {
+            left:       cb.left   + OFF,
+            top:        cb.top    + OFF,
+            width:      cb.width,
+            fontFamily: cb.fontFamily,
+            fontSize:   cb.fontSize,
+            fill:       cb.fill,
+          }) as fabric.Textbox & { data: { type: string } }
+          textbox.data = { type: 'text' }
+          activeCanvas.add(textbox)
+          activeCanvas.setActiveObject(textbox)
+        }
+
+        activeCanvas.renderAll()
+        saveHistory(activeCanvas)
+        return
+      }
+
       // ── Ctrl/Cmd + Z: undo ───────────────────────────────────────────────
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
@@ -502,7 +595,12 @@ export default function Canvas({
       }
 
       if (e.key === 'Escape') {
-        exitPanMode()
+        if (isPanMode.current) {
+          isPanMode.current    = false
+          panData.current      = null
+          panTargetRef.current = null
+          ;[lc, rc].forEach(c => { c.selection = true; c.defaultCursor = 'default'; c.renderAll() })
+        }
         return
       }
 
@@ -525,7 +623,7 @@ export default function Canvas({
         }).data
 
         if (data?.type === 'photo') {
-          if (obj === panTarget) exitPanMode(false)
+          if (isPanMode.current) { isPanMode.current = false; panData.current = null; panTargetRef.current = null; fc.defaultCursor = 'default' }
           restoreEmptyFrame(fc, data)
           fc.remove(obj); fc.discardActiveObject(); fc.renderAll()
           return
@@ -623,9 +721,6 @@ export default function Canvas({
                 >
                   <canvas ref={leftElRef} />
                   {showBleed && <BleedOverlay />}
-                  {panModeActive === 'left' && (
-                    <div className="canvas-pan-label">Editando foto · ESC para salir</div>
-                  )}
                   {textSel?.side === 'left' && !textEditing && (
                     <button
                       className="canvas-text-delete"
@@ -661,9 +756,6 @@ export default function Canvas({
                 >
                   <canvas ref={rightElRef} />
                   {showBleed && <BleedOverlay />}
-                  {panModeActive === 'right' && (
-                    <div className="canvas-pan-label">Editando foto · ESC para salir</div>
-                  )}
                   {textSel?.side === 'right' && !textEditing && (
                     <button
                       className="canvas-text-delete"

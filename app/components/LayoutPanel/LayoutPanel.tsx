@@ -23,10 +23,10 @@ function LayoutThumbnail({ layout }: { layout: Layout }) {
           key={i}
           className="layout-thumb-frame"
           style={{
-            left:   `${frame.x * 100}%`,
-            top:    `${frame.y * 100}%`,
-            width:  `${frame.w * 100}%`,
-            height: `${frame.h * 100}%`,
+            left:   `${(frame.x * 100).toFixed(4)}%`,
+            top:    `${(frame.y * 100).toFixed(4)}%`,
+            width:  `${(frame.w * 100).toFixed(4)}%`,
+            height: `${(frame.h * 100).toFixed(4)}%`,
           }}
         />
       ))}
@@ -71,7 +71,6 @@ export default function LayoutPanel({
             key={layout.id}
             className={`layout-thumb${selectedLayoutId === layout.id ? ' layout-thumb--selected' : ''}`}
             onClick={() => onLayoutSelect(layout)}
-            title={layout.nombre}
             aria-label={layout.nombre}
             draggable
             onDragStart={(e) => {

@@ -20,6 +20,8 @@ type PhotoData = {
   frameH: number
   naturalW: number  // intrinsic pixel width of the source image
   naturalH: number  // intrinsic pixel height of the source image
+  imgLeft: number   // current center-X of image (updated as user pans in content mode)
+  imgTop: number    // current center-Y of image
 }
 
 type TextData = {
@@ -235,6 +237,8 @@ export async function dropPhotoOnFrame(
     frameH,
     naturalW,
     naturalH,
+    imgLeft: frameX + frameW / 2,
+    imgTop:  frameY + frameH / 2,
   }
 
   // Remove frame AFTER coordinates captured, then add image
@@ -474,6 +478,8 @@ export async function deserializePage(
         frameH:  sf.frameH,
         naturalW,
         naturalH,
+        imgLeft: sf.imgLeft ?? sf.frameX + sf.frameW / 2,
+        imgTop:  sf.imgTop  ?? sf.frameY + sf.frameH / 2,
       }
       canvas.add(img)
     }

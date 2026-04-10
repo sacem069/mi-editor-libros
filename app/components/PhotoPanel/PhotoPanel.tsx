@@ -69,17 +69,18 @@ export default function PhotoPanel({
         return next
       })
 
-      const uploaded = await Promise.all(
+      const results = await Promise.allSettled(
         placeholders.map(async ({ tempId, file }) => {
           const form = new FormData()
           form.append('file', file)
 
           const res  = await fetch('/api/upload', { method: 'POST', body: form })
           const data = await res.json() as {
-            url:      string
-            publicId: string
-            width:    number
-            height:   number
+            url?:     string
+            publicId?: string
+            width?:   number
+            height?:  number
+            error?:   string
           }
 
           setUploadingIds((prev) => {
@@ -88,17 +89,30 @@ export default function PhotoPanel({
             return next
           })
 
+          if (!res.ok || !data.url) {
+            throw new Error(data.error ?? `Error subiendo ${file.name}`)
+          }
+
           return {
             id:     tempId,
             src:    data.url,
             name:   file.name,
-            width:  data.width,
-            height: data.height,
+            width:  data.width  ?? 0,
+            height: data.height ?? 0,
           } satisfies Photo
         }),
       )
 
-      onUpload(uploaded)
+      const uploaded: Photo[] = []
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          uploaded.push(r.value)
+        } else {
+          console.error('[PhotoPanel] upload failed:', r.reason)
+        }
+      }
+
+      if (uploaded.length > 0) onUpload(uploaded)
     },
     [onUpload],
   )
