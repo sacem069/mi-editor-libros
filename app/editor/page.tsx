@@ -6,6 +6,7 @@ import * as fabric from 'fabric'
 
 import Topbar      from '../components/Topbar/Topbar'
 import Toolbar     from '../components/Toolbar/Toolbar'
+import TextModal, { type TextOpts } from '../components/TextModal/TextModal'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
 // Canvas uses Fabric.js (browser-only). Dynamic import with ssr:false prevents
 // Next.js from attempting to server-render it, eliminating all hydration errors.
@@ -59,6 +60,12 @@ export default function EditorPage() {
   // ── Fabric instances ───────────────────────────────────────────────────────
   const fabricLeft  = useRef<fabric.Canvas | null>(null)
   const fabricRight = useRef<fabric.Canvas | null>(null)
+
+  // ── Text edit modal ────────────────────────────────────────────────────────
+  const [textModal, setTextModal] = useState<{
+    textbox: fabric.Textbox
+    side:    'left' | 'right'
+  } | null>(null)
 
   // ── Active page (last clicked page in Canvas) ──────────────────────────────
   const activePageRef = useRef<'left' | 'right'>('left')
@@ -200,6 +207,33 @@ export default function EditorPage() {
     addTextBox(fc, PAGE_W, PAGE_H)
     saveCurrentSpread()
   }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Text edit modal handlers ───────────────────────────────────────────────
+  const handleTextEdit = useCallback((textbox: fabric.Textbox, side: 'left' | 'right') => {
+    setTextModal({ textbox, side })
+  }, [])
+
+  const handleTextConfirm = useCallback((opts: TextOpts) => {
+    if (!textModal) return
+    const { textbox, side } = textModal
+    textbox.set({
+      text:       opts.text,
+      fontFamily: opts.fontFamily,
+      fontWeight: opts.bold ? 'bold' : 'normal',
+      underline:  opts.underline,
+      textAlign:  opts.textAlign as fabric.Textbox['textAlign'],
+      fontSize:   opts.fontSize,
+      fill:       opts.fill,
+    })
+    const fc = side === 'left' ? fabricLeft.current : fabricRight.current
+    fc?.renderAll()
+    saveCurrentSpread()
+    setTextModal(null)
+  }, [textModal, saveCurrentSpread])
+
+  const handleTextCancel = useCallback(() => {
+    setTextModal(null)
+  }, [])
 
   // ── Undo ───────────────────────────────────────────────────────────────────
   const handleUndo = useCallback(async () => {
@@ -346,6 +380,7 @@ export default function EditorPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="editor-root">
       <Topbar />
 
@@ -380,6 +415,7 @@ export default function EditorPage() {
             onActivePageChange={handleActivePageChange}
             onLayoutDropOnPage={handleLayoutDropOnPage}
             onPhotoDrop={handlePhotoDrop}
+            onTextEdit={handleTextEdit}
           />
 
           <PageStrip
@@ -400,5 +436,20 @@ export default function EditorPage() {
         />
       </div>
     </div>
+
+    {textModal && (
+      <TextModal
+        initialText={textModal.textbox.text ?? ''}
+        initialFont={textModal.textbox.fontFamily ?? 'amandine'}
+        initialBold={textModal.textbox.fontWeight === 'bold'}
+        initialUnderline={textModal.textbox.underline ?? false}
+        initialAlign={textModal.textbox.textAlign ?? 'left'}
+        initialSize={textModal.textbox.fontSize ?? 24}
+        initialColor={(textModal.textbox.fill as string) ?? '#191919'}
+        onConfirm={handleTextConfirm}
+        onCancel={handleTextCancel}
+      />
+    )}
+    </>
   )
 }

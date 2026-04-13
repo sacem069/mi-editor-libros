@@ -45,8 +45,12 @@ export async function POST(req: NextRequest) {
           transformation: [{ format: 'jpg', quality: 'auto' }],
         },
         (error, result) => {
-          if (error || !result) reject(error ?? new Error('Upload failed'))
-          else resolve(result as typeof result & { width: number; height: number })
+          if (error || !result) {
+            console.error('[upload] Cloudinary error:', JSON.stringify(error, null, 2))
+            reject(error ?? new Error('Upload failed'))
+          } else {
+            resolve(result as typeof result & { width: number; height: number })
+          }
         },
       ).end(buffer)
     })

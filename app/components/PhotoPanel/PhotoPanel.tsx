@@ -53,7 +53,10 @@ export default function PhotoPanel({
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? [])
+      const SUPPORTED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
+      const files = Array.from(e.target.files ?? []).filter(
+        (f) => f.type === '' || SUPPORTED.has(f.type),
+      )
       if (files.length === 0) return
       e.target.value = ''
 
@@ -108,7 +111,7 @@ export default function PhotoPanel({
         if (r.status === 'fulfilled') {
           uploaded.push(r.value)
         } else {
-          console.error('[PhotoPanel] upload failed:', r.reason)
+          // skip silently — full error already logged on the server
         }
       }
 

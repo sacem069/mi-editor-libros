@@ -36,6 +36,7 @@ interface CanvasProps {
   onActivePageChange: (page: 'left' | 'right') => void
   onLayoutDropOnPage: (layoutId: string, page: 'left' | 'right') => void
   onPhotoDrop: (photoId: string) => void
+  onTextEdit?: (textbox: fabric.Textbox, side: 'left' | 'right') => void
 }
 
 function spreadLabel(spread: number): { left: string; right: string } {
@@ -79,6 +80,7 @@ export default function Canvas({
   onActivePageChange,
   onLayoutDropOnPage,
   onPhotoDrop,
+  onTextEdit,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
@@ -118,6 +120,7 @@ export default function Canvas({
   const onActivePageChangeRef = useRef(onActivePageChange)
   const onLayoutDropOnPageRef = useRef(onLayoutDropOnPage)
   const onPhotoDropRef        = useRef(onPhotoDrop)
+  const onTextEditRef         = useRef(onTextEdit)
   const zoomRef               = useRef(zoom)
 
   useEffect(() => { onObjectSelectedRef.current   = onObjectSelected   }, [onObjectSelected])
@@ -126,6 +129,7 @@ export default function Canvas({
   useEffect(() => { onActivePageChangeRef.current  = onActivePageChange  }, [onActivePageChange])
   useEffect(() => { onLayoutDropOnPageRef.current  = onLayoutDropOnPage  }, [onLayoutDropOnPage])
   useEffect(() => { onPhotoDropRef.current         = onPhotoDrop         }, [onPhotoDrop])
+  useEffect(() => { onTextEditRef.current          = onTextEdit          }, [onTextEdit])
   useEffect(() => { zoomRef.current                = zoom               }, [zoom])
 
   // ── Initial zoom: hardcoded 49% ──────────────────────────────────────────
@@ -293,7 +297,19 @@ export default function Canvas({
         }
         saveHistory(fc)
       })
-      fc.on('text:editing:entered', () => setTextEditing(true))
+      fc.on('text:editing:entered', () => {
+        // If a modal handler is wired up, bail out of Fabric's built-in editing
+        // immediately. The modal was already opened from mouse:dblclick.
+        if (onTextEditRef.current) {
+          const obj = fc.getActiveObject()
+          if (obj instanceof fabric.Textbox) {
+            ;(obj as fabric.Textbox).exitEditing()
+            fc.renderAll()
+          }
+          return
+        }
+        setTextEditing(true)
+      })
       fc.on('text:editing:exited',  () => setTextEditing(false))
 
       // ── Photo scaling: maintain cover-fit, update clipPath ────────────────
@@ -377,9 +393,17 @@ export default function Canvas({
         )
       })
 
-      // ── Double-click: enter content (pan) mode ───────────────────────────
+      // ── Double-click: textbox → modal | photo → pan mode ────────────────
       fc.on('mouse:dblclick', (e) => {
         const obj = fc.findTarget(e.e)
+
+        if (obj instanceof fabric.Textbox && onTextEditRef.current) {
+          // Open the text edit modal instead of Fabric's built-in editing.
+          // exitEditing() is also called in text:editing:entered as a safety net.
+          onTextEditRef.current(obj as fabric.Textbox, side)
+          return
+        }
+
         if (obj && (obj as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
           isPanMode.current    = true   // FIRST — before any Fabric property changes
           panTargetRef.current = obj as fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }

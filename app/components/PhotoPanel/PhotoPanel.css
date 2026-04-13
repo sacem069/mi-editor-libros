@@ -8,12 +8,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* altura calculada por el layout padre (editor page) */
+  min-height: 0;
+  /* height comes from align-self: stretch (flex row default) */
 }
 
 /* ─── Acciones superiores ────────────────────────────────────────────────────── */
 
 .photo-panel-actions {
+  flex-shrink: 0;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -124,6 +126,7 @@
 /* ─── Auto-crear ─────────────────────────────────────────────────────────────── */
 
 .photo-panel-autocreate-row {
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
   padding: 10px 16px 0;
@@ -149,6 +152,7 @@
 /* ─── Contador ───────────────────────────────────────────────────────────────── */
 
 .photo-panel-counter {
+  flex-shrink: 0;
   font-family: var(--font-body);
   font-size: 16px;
   color: #282828;
@@ -159,6 +163,7 @@
 /* ─── Separator ──────────────────────────────────────────────────────────────── */
 
 .photo-panel-bar {
+  flex-shrink: 0;
   height: 3px;
   background: var(--color-blue);
   margin: 10px 16px 0;
@@ -169,10 +174,13 @@
 
 .photo-grid {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow-y: scroll;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  grid-auto-rows: 96px;
+  align-content: start;
+  gap: 8px;
   padding: 10px 10px 10px;
   /* scrollbar delgada estilo Figma */
   scrollbar-width: thin;
@@ -196,7 +204,7 @@
 
 .photo-thumb {
   position: relative;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   overflow: hidden;
   cursor: grab;
   border: 1.5px solid transparent;
@@ -216,7 +224,7 @@
 .photo-thumb-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   pointer-events: none; /* evita interferir con el drag */
 }
