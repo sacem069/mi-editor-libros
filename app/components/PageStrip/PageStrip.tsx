@@ -11,17 +11,18 @@ interface PageStripProps {
   onAddSpread: () => void
   onDeleteSpread?: (index: number) => void
   onLayoutDrop?: (spreadIndex: number, layoutId: string) => void
+  thumbnails?: Record<number, { left: string; right: string }>
 }
 
-type PageInfo  = { label: string; special: boolean }
+type PageInfo  = { label: string; special: boolean; cover?: boolean }
 type SpreadDef = { index: number; left: PageInfo; right: PageInfo }
 
 function buildSpreads(total: number): SpreadDef[] {
   const lastLeftNum = total * 2 + 2   // e.g. 13*2+2 = 28
 
   const items: SpreadDef[] = [
-    { index: 0, left:  { label: 'Contra', special: true },
-                right: { label: 'Tapa',   special: true } },
+    { index: 0, left:  { label: 'Contra', special: true, cover: true },
+                right: { label: 'Tapa',   special: true, cover: true } },
     { index: 1, left:  { label: 'Inside', special: true },
                 right: { label: '01',     special: false } },
   ]
@@ -53,6 +54,7 @@ export default function PageStrip({
   onAddSpread,
   onDeleteSpread,
   onLayoutDrop,
+  thumbnails,
 }: PageStripProps) {
   const spreads    = buildSpreads(totalContentSpreads)
   const activeRef  = useRef<HTMLDivElement>(null)
@@ -148,18 +150,34 @@ export default function PageStrip({
 
               {/* Left page */}
               <div className="page-strip-page-wrap">
-                <span className={`page-strip-page-label${spread.left.special ? ' page-strip-page-label--special' : ''}`}>
+                <span className={[
+                  'page-strip-page-label',
+                  spread.left.special ? 'page-strip-page-label--special' : '',
+                  spread.left.cover   ? 'page-strip-page-label--cover'   : '',
+                ].filter(Boolean).join(' ')}>
                   {spread.left.label}
                 </span>
-                <div className="page-strip-page-rect" />
+                <div className="page-strip-page-rect">
+                  {thumbnails?.[spread.index]?.left && (
+                    <img src={thumbnails[spread.index].left} alt="" className="page-strip-thumb" />
+                  )}
+                </div>
               </div>
 
               {/* Right page */}
               <div className="page-strip-page-wrap page-strip-page-wrap--right">
-                <span className={`page-strip-page-label${spread.right.special ? ' page-strip-page-label--special' : ''}`}>
+                <span className={[
+                  'page-strip-page-label',
+                  spread.right.special ? 'page-strip-page-label--special' : '',
+                  spread.right.cover   ? 'page-strip-page-label--cover'   : '',
+                ].filter(Boolean).join(' ')}>
                   {spread.right.label}
                 </span>
-                <div className="page-strip-page-rect" />
+                <div className="page-strip-page-rect">
+                  {thumbnails?.[spread.index]?.right && (
+                    <img src={thumbnails[spread.index].right} alt="" className="page-strip-thumb" />
+                  )}
+                </div>
               </div>
             </div>
           )

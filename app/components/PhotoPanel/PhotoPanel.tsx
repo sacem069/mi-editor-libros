@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useCallback, useState, useEffect } from 'react'
-import { CirclePlus, ListFilter, Check } from 'lucide-react'
+import { CirclePlus, ListFilter, Check, Trash2 } from 'lucide-react'
 import './PhotoPanel.css'
 
 export type Photo = {
@@ -17,6 +17,7 @@ interface PhotoPanelProps {
   usedPhotoIds: Set<string>
   onUpload:     (photos: Photo[]) => void
   onPhotoClick: (photo: Photo) => void
+  onDelete:     (photoId: string) => void
 }
 
 type SortBy     = 'fecha' | 'nombre'
@@ -27,6 +28,7 @@ export default function PhotoPanel({
   usedPhotoIds,
   onUpload,
   onPhotoClick,
+  onDelete,
 }: PhotoPanelProps) {
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const filterWrapRef = useRef<HTMLDivElement>(null)
@@ -217,11 +219,6 @@ export default function PhotoPanel({
         onChange={handleFileChange}
       />
 
-      {/* ── Auto-crear ── */}
-      <div className="photo-panel-autocreate-row">
-        <button className="photo-autocreate-btn">Auto-crear</button>
-      </div>
-
       {/* ── Contador ── */}
       <div className="photo-panel-counter">
         {photos.length} fotos
@@ -258,6 +255,14 @@ export default function PhotoPanel({
                   <Check size={10} strokeWidth={3} color="#fff" />
                 </div>
               )}
+
+              <button
+                className="photo-thumb-delete"
+                aria-label="Eliminar foto"
+                onClick={(e) => { e.stopPropagation(); onDelete(photo.id) }}
+              >
+                <Trash2 size={11} strokeWidth={1.8} />
+              </button>
             </div>
           )
         })}

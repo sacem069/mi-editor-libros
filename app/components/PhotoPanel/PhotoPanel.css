@@ -271,10 +271,39 @@
   right: 4px;
   width: 16px;
   height: 16px;
-  background: #22c55e; /* green-500 */
+  background: #22c55e;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+
+/* ─── Botón eliminar foto ────────────────────────────────────────────────────── */
+
+.photo-thumb-delete {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  background: rgba(25, 25, 25, 0.65);
+  border: none;
+  border-radius: 2px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.photo-thumb:hover .photo-thumb-delete {
+  opacity: 1;
+}
+
+.photo-thumb-delete:hover {
+  background: rgba(220, 38, 38, 0.85);
 }

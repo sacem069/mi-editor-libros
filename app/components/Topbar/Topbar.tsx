@@ -2,7 +2,11 @@ import './Topbar.css'
 import Image from 'next/image'
 import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
 
-export default function Topbar() {
+interface TopbarProps {
+  onPreview?: () => void
+}
+
+export default function Topbar({ onPreview }: TopbarProps) {
   return (
     <div className="topbar">
       <Image
@@ -27,7 +31,7 @@ export default function Topbar() {
           <ArrowDownToLine size={18} strokeWidth={1.5} />
           <span>Guardar</span>
         </button>
-        <button className="topbar-action-btn">
+        <button className="topbar-action-btn" onClick={onPreview}>
           <Eye size={18} strokeWidth={1.5} />
           <span>Previsualizar</span>
         </button>

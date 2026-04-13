@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import * as fabric from 'fabric'
 
@@ -10,7 +10,8 @@ import TextModal, { type TextOpts } from '../components/TextModal/TextModal'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
 // Canvas uses Fabric.js (browser-only). Dynamic import with ssr:false prevents
 // Next.js from attempting to server-render it, eliminating all hydration errors.
-const Canvas = dynamic(() => import('../components/Canvas/Canvas'), { ssr: false })
+const Canvas       = dynamic(() => import('../components/Canvas/Canvas'),             { ssr: false })
+const PreviewModal = dynamic(() => import('../components/PreviewModal/PreviewModal'), { ssr: false })
 import LayoutPanel from '../components/LayoutPanel/LayoutPanel'
 import PageStrip   from '../components/PageStrip/PageStrip'
 import type { Layout } from '../components/LayoutPanel/LayoutPanel'
@@ -34,9 +35,14 @@ type SpreadSnapshot = { left: PageData; right: PageData }
 
 export default function EditorPage() {
 
+  // ── Preview ────────────────────────────────────────────────────────────────
+  const [previewOpen,     setPreviewOpen]     = useState(false)
+  const [previewSnapshot, setPreviewSnapshot] = useState<Record<number, SpreadSnapshot>>({})
+
   // ── Photos ─────────────────────────────────────────────────────────────────
   const [photos,       setPhotos]       = useState<Photo[]>([])
   const [usedPhotoIds, setUsedPhotoIds] = useState<Set<string>>(new Set())
+  const photosRef = useRef<Photo[]>([])
 
   // ── Book / navigation ──────────────────────────────────────────────────────
   const [currentSpread,       setCurrentSpread]       = useState(0)
@@ -67,6 +73,78 @@ export default function EditorPage() {
     side:    'left' | 'right'
   } | null>(null)
 
+  // ── Thumbnails (live previews in PageStrip) ────────────────────────────────
+  const [thumbnails,      setThumbnails]      = useState<Record<number, { left: string; right: string }>>({})
+  const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cached static thumbnails — set once at mount, reused when spreads are added/removed
+  const blankThumbRef    = useRef<string>('')
+  const noEditThumbRef   = useRef<string>('')
+  const logoThumbRef     = useRef<string>('')
+
+  // Generate initial thumbnails on mount so the strip never shows grey rects
+  useEffect(() => {
+    const W = 82    // 816 × 0.1
+    const H = 106   // 1058 × 0.1
+    const total = totalContentSpreads + 3  // same as totalSpreads
+    const lastIdx = total - 1
+
+    const mk = () => {
+      const c = document.createElement('canvas')
+      c.width = W; c.height = H
+      return c
+    }
+
+    // White blank page
+    const blankCanvas = mk()
+    const bCtx = blankCanvas.getContext('2d')!
+    bCtx.fillStyle = '#ffffff'
+    bCtx.fillRect(0, 0, W, H)
+    const blank = blankCanvas.toDataURL('image/jpeg', 0.85)
+    blankThumbRef.current = blank
+
+    // Grey "No editable" page
+    const neCanvas = mk()
+    const nCtx = neCanvas.getContext('2d')!
+    nCtx.fillStyle = '#e8e8e8'
+    nCtx.fillRect(0, 0, W, H)
+    nCtx.fillStyle = '#666666'
+    nCtx.font = 'bold 6.5px sans-serif'
+    nCtx.textAlign = 'center'
+    nCtx.textBaseline = 'middle'
+    nCtx.fillText('No editable', W / 2, H / 2)
+    const noEdit = neCanvas.toDataURL('image/jpeg', 0.85)
+    noEditThumbRef.current = noEdit
+
+    // Build initial map: spread 1 left = no-edit, last right = no-edit, rest = blank
+    const initial: Record<number, { left: string; right: string }> = {}
+    for (let i = 0; i < total; i++) {
+      initial[i] = {
+        left:  i === 1 ? noEdit : blank,
+        right: i === lastIdx ? noEdit : blank,
+      }
+    }
+    setThumbnails(initial)
+
+    // Last spread left page: draw logo over white
+    const img = new window.Image()
+    img.onload = () => {
+      const c = mk()
+      const ctx = c.getContext('2d')!
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, W, H)
+      const logoW = W * 0.55
+      const logoH = logoW * (img.height / img.width)
+      ctx.drawImage(img, (W - logoW) / 2, (H - logoH) / 2 - 4, logoW, logoH)
+      const logoDataUrl = c.toDataURL('image/jpeg', 0.85)
+      logoThumbRef.current = logoDataUrl
+      setThumbnails(prev => ({
+        ...prev,
+        [lastIdx]: { ...prev[lastIdx], left: logoDataUrl },
+      }))
+    }
+    img.src = '/LogoZeika.jpg'
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Active page (last clicked page in Canvas) ──────────────────────────────
   const activePageRef = useRef<'left' | 'right'>('left')
 
@@ -82,6 +160,39 @@ export default function EditorPage() {
   // ── Helpers ────────────────────────────────────────────────────────────────
   const getActiveFabric   = () => activePageRef.current === 'right' ? fabricRight.current : fabricLeft.current
   const getInactiveFabric = () => activePageRef.current === 'right' ? fabricLeft.current  : fabricRight.current
+
+  // ── Keep photosRef current so callbacks can read the latest array ─────────
+  useEffect(() => { photosRef.current = photos }, [photos])
+
+  // ── Recompute used photos by scanning all saved spreads ───────────────────
+  // Runs after every saveCurrentSpread so filters stay accurate even when
+  // photos are deleted from the canvas or the user navigates between spreads.
+  const recomputeUsedPhotos = useCallback(() => {
+    const usedSrcs = new Set<string>()
+    for (const snapshot of Object.values(spreadsData.current)) {
+      for (const page of [snapshot.left, snapshot.right]) {
+        for (const frame of page.frames) {
+          if (!frame.isEmpty && frame.photo) usedSrcs.add(frame.photo)
+        }
+      }
+    }
+    setUsedPhotoIds(new Set(
+      photosRef.current.filter((p) => usedSrcs.has(p.src)).map((p) => p.id)
+    ))
+  }, [])
+
+  // ── Capture thumbnails for the PageStrip ─────────────────────────────────
+  const captureThumbnail = useCallback((spreadIndex: number) => {
+    const lc = fabricLeft.current
+    const rc = fabricRight.current
+    if (!lc || !rc) return
+    try {
+      const opts = { format: 'jpeg' as const, quality: 0.6, multiplier: 0.08 }
+      const leftUrl  = lc.toDataURL(opts)
+      const rightUrl = rc.toDataURL(opts)
+      setThumbnails((prev) => ({ ...prev, [spreadIndex]: { left: leftUrl, right: rightUrl } }))
+    } catch (_) { /* canvas not ready */ }
+  }, [])
 
   // ── Push a snapshot to undo history ───────────────────────────────────────
   const pushHistory = useCallback(() => {
@@ -116,7 +227,14 @@ export default function EditorPage() {
       right: serializePage(rc, PAGE_W, PAGE_H),
     }
     pushHistory()
-  }, [pushHistory])
+    recomputeUsedPhotos()
+
+    // Debounced thumbnail — avoids capturing on every keystroke/drag event
+    if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current)
+    thumbnailTimerRef.current = setTimeout(() => {
+      captureThumbnail(currentSpreadRef.current)
+    }, 400)
+  }, [pushHistory, captureThumbnail, recomputeUsedPhotos])
 
   // ── Canvas ready: restore saved state, then wire change listeners ───────────
   const handleCanvasReady = useCallback(
@@ -156,6 +274,15 @@ export default function EditorPage() {
     setPhotos((prev) => [...prev, ...uploaded])
   }, [])
 
+  // ── Photo delete (from panel) ──────────────────────────────────────────────
+  const handlePhotoDelete = useCallback((photoId: string) => {
+    setPhotos((prev) => {
+      photosRef.current = prev.filter((p) => p.id !== photoId)
+      return photosRef.current
+    })
+    recomputeUsedPhotos()
+  }, [recomputeUsedPhotos])
+
   // ── Photo click: place in first empty frame, active page first ─────────────
   const handlePhotoClick = useCallback(async (photo: Photo) => {
     for (const fc of [getActiveFabric(), getInactiveFabric()]) {
@@ -167,7 +294,6 @@ export default function EditorPage() {
 
       if (emptyFrame) {
         await dropPhotoOnFrame(fc, emptyFrame, photo.src, PAGE_W, PAGE_H)
-        setUsedPhotoIds((prev) => new Set([...prev, photo.id]))
         saveCurrentSpread()
         return
       }
@@ -175,8 +301,7 @@ export default function EditorPage() {
   }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Photo dropped onto canvas frame (from drag) ────────────────────────────
-  const handlePhotoDrop = useCallback((photoId: string) => {
-    setUsedPhotoIds((prev) => new Set([...prev, photoId]))
+  const handlePhotoDrop = useCallback((_photoId: string) => {
     saveCurrentSpread()
   }, [saveCurrentSpread])
 
@@ -292,6 +417,8 @@ export default function EditorPage() {
       left:  serializePage(lc, PAGE_W, PAGE_H),
       right: serializePage(rc, PAGE_W, PAGE_H),
     }
+    // Capture thumbnail of the spread we're leaving
+    captureThumbnail(currentSpreadRef.current)
 
     // 2. Advance the index BEFORE deserializing the new spread.
     //    deserializePage triggers Fabric object:added/removed events which call
@@ -326,12 +453,31 @@ export default function EditorPage() {
     setCanUndo(false)
     setCanRedo(false)
     pushHistory()
-  }, [pushHistory])
+  }, [pushHistory, captureThumbnail])
 
   // ── Add spread ─────────────────────────────────────────────────────────────
   const handleAddSpread = useCallback(() => {
+    const oldLastIdx = totalContentSpreads + 2   // current last spread index
+    const newLastIdx = totalContentSpreads + 3   // last spread index after adding
+
+    // Move last spread's canvas data to the new last position
+    const lastData = spreadsData.current[oldLastIdx]
+    if (lastData) {
+      spreadsData.current[newLastIdx] = lastData
+      delete spreadsData.current[oldLastIdx]
+    }
+
+    // Move last spread's thumbnail to the new last position,
+    // replacing the old last slot with a blank page
+    setThumbnails((prev) => {
+      const next = { ...prev }
+      next[newLastIdx] = prev[oldLastIdx] ?? { left: logoThumbRef.current, right: noEditThumbRef.current }
+      next[oldLastIdx] = { left: blankThumbRef.current, right: blankThumbRef.current }
+      return next
+    })
+
     setTotalContentSpreads((n) => n + 1)
-  }, [])
+  }, [totalContentSpreads])
 
   // ── Delete spread ──────────────────────────────────────────────────────────
   const handleDeleteSpread = useCallback(async (spreadIndex: number) => {
@@ -344,6 +490,16 @@ export default function EditorPage() {
       if (next) spreadsData.current[j] = next
       else      delete spreadsData.current[j]
     }
+
+    // Shift thumbnails the same way so the last-spread thumbnail follows
+    setThumbnails((prev) => {
+      const next = { ...prev }
+      for (let j = spreadIndex; j <= lastIndex; j++) {
+        if (prev[j + 1]) next[j] = prev[j + 1]
+        else             delete next[j]
+      }
+      return next
+    })
 
     const newTotal  = totalContentSpreads - 1
     const maxSpread = newTotal + 2
@@ -378,11 +534,21 @@ export default function EditorPage() {
     // futuro: mostrar propiedades en toolbar
   }, [])
 
+  // ── Preview ────────────────────────────────────────────────────────────────
+  const handleOpenPreview = useCallback(() => {
+    // Flush the current spread into spreadsData before snapshotting
+    saveCurrentSpread()
+    setPreviewSnapshot({ ...spreadsData.current })
+    setPreviewOpen(true)
+  }, [saveCurrentSpread])
+
+  const handleClosePreview = useCallback(() => setPreviewOpen(false), [])
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
     <div className="editor-root">
-      <Topbar />
+      <Topbar onPreview={handleOpenPreview} />
 
       <div className="editor-body">
         <PhotoPanel
@@ -390,6 +556,7 @@ export default function EditorPage() {
           usedPhotoIds={usedPhotoIds}
           onUpload={handlePhotoUpload}
           onPhotoClick={handlePhotoClick}
+          onDelete={handlePhotoDelete}
         />
 
         <div className="editor-center">
@@ -425,6 +592,7 @@ export default function EditorPage() {
             onAddSpread={handleAddSpread}
             onDeleteSpread={handleDeleteSpread}
             onLayoutDrop={handleLayoutDrop}
+            thumbnails={thumbnails}
           />
         </div>
 
@@ -436,6 +604,15 @@ export default function EditorPage() {
         />
       </div>
     </div>
+
+    {previewOpen && (
+      <PreviewModal
+        spreadsData={previewSnapshot}
+        totalSpreads={totalSpreads}
+        initialSpread={currentSpread}
+        onClose={handleClosePreview}
+      />
+    )}
 
     {textModal && (
       <TextModal

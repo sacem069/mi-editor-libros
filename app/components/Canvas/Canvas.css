@@ -54,13 +54,21 @@
 .canvas-page-num {
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 20px;
+  font-size: 28px;
   color: #515151;
-  height: 32px;
+  height: 52px;
+  width: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding-left: 4px;
+  padding-top: 8px;
   user-select: none;
+}
+
+.canvas-page-num--right {
+  justify-content: flex-end;
+  padding-left: 0;
+  padding-right: 4px;
 }
 
 .canvas-page-wrap {
@@ -95,7 +103,7 @@
   height: 1058px; /* PAGE_H */
   background: #000;
   flex-shrink: 0;
-  margin-top: 32px; /* matches canvas-page-num height */
+  margin-top: 52px; /* matches canvas-page-num height */
 }
 
 /* ─── Navigation ─────────────────────────────────────────────────────────────── */
@@ -134,7 +142,7 @@
 .canvas-nav-label {
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 18px;
+  font-size: 26px;
   color: var(--color-text);
   white-space: nowrap;
   user-select: none;

@@ -39,11 +39,16 @@ interface CanvasProps {
   onTextEdit?: (textbox: fabric.Textbox, side: 'left' | 'right') => void
 }
 
-function spreadLabel(spread: number): { left: string; right: string } {
+function spreadLabel(spread: number, totalSpreads: number): { left: string; right: string } {
   if (spread === 0) return { left: 'Contra', right: 'Tapa' }
-  const left  = String(spread * 2).padStart(2, '0')
-  const right = String(spread * 2 + 1).padStart(2, '0')
-  return { left, right }
+  if (spread === 1) return { left: 'Inside', right: '01' }
+  if (spread === totalSpreads - 1) {
+    const lastLeft = String((totalSpreads - 3) * 2 + 2).padStart(2, '0')
+    return { left: lastLeft, right: 'Outside' }
+  }
+  const leftNum  = 2 * (spread - 1)
+  const rightNum = leftNum + 1
+  return { left: String(leftNum).padStart(2, '0'), right: String(rightNum).padStart(2, '0') }
 }
 
 function BleedOverlay() {
@@ -701,7 +706,7 @@ export default function Canvas({
   const handleDragLeave = useCallback(() => setDragOverPage(null), [])
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread)
+  const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread, totalSpreads)
   const goLeft      = () => onSpreadChange(Math.max(0, currentSpread - 1))
   const goRight     = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
   const isLastSpread    = currentSpread === totalSpreads - 1
@@ -770,7 +775,7 @@ export default function Canvas({
 
               {/* Right page */}
               <div className="canvas-page-col">
-                <div className="canvas-page-num">{rightLabel}</div>
+                <div className="canvas-page-num canvas-page-num--right">{rightLabel}</div>
                 <div
                   className={[
                     'canvas-page-wrap',
@@ -810,7 +815,13 @@ export default function Canvas({
             {/* Navigation */}
             <div className="canvas-nav">
               <button className="canvas-nav-arrow" onClick={goLeft}  disabled={currentSpread === 0}               aria-label="Página anterior">{'<'}</button>
-              <span   className="canvas-nav-label">Página&nbsp;&nbsp;{leftLabel} - {rightLabel}</span>
+              <span   className="canvas-nav-label">
+                {currentSpread === 0
+                  ? 'Portada'
+                  : currentSpread === totalSpreads - 1
+                  ? 'Contratapa'
+                  : `Página ${currentSpread}`}
+              </span>
               <button className="canvas-nav-arrow" onClick={goRight} disabled={currentSpread === totalSpreads - 1} aria-label="Página siguiente">{'>'}</button>
             </div>
           </div>
