@@ -704,7 +704,8 @@ export default function Canvas({
   const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread)
   const goLeft      = () => onSpreadChange(Math.max(0, currentSpread - 1))
   const goRight     = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
-  const isLastSpread = currentSpread === totalSpreads - 1
+  const isLastSpread    = currentSpread === totalSpreads - 1
+  const isFirstInside   = currentSpread === 1
 
   // ── Render ────────────────────────────────────────────────────────────────
   const scaledW = SPREAD_W * zoom
@@ -742,6 +743,11 @@ export default function Canvas({
                       <img src="/LogoZeika.jpg" alt="Zeika Memories" className="canvas-logo-img" />
                     </div>
                   )}
+                  {isFirstInside && (
+                    <div className="canvas-no-edit-overlay" aria-hidden="true">
+                      <span className="canvas-no-edit-label">No editable</span>
+                    </div>
+                  )}
                   {textSel?.side === 'left' && !textEditing && (
                     <button
                       className="canvas-text-delete"
@@ -777,6 +783,11 @@ export default function Canvas({
                 >
                   <canvas ref={rightElRef} />
                   {showBleed && <BleedOverlay />}
+                  {isLastSpread && (
+                    <div className="canvas-no-edit-overlay" aria-hidden="true">
+                      <span className="canvas-no-edit-label">No editable</span>
+                    </div>
+                  )}
                   {textSel?.side === 'right' && !textEditing && (
                     <button
                       className="canvas-text-delete"

@@ -142,6 +142,47 @@
 
 /* ─── Zoom badge ─────────────────────────────────────────────────────────────── */
 
+/* ─── Logo overlay (última carilla izquierda) ────────────────────────────────── */
+
+.canvas-logo-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.canvas-logo-img {
+  width: 260px;
+  height: auto;
+  object-fit: contain;
+  margin-top: -80px;
+}
+
+/* ─── No editable overlay (contratapa interior) ─────────────────────────────── */
+
+.canvas-no-edit-overlay {
+  position: absolute;
+  inset: 0;
+  background: #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.canvas-no-edit-label {
+  font-family: var(--font-body);
+  font-size: 32px;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
 /* ─── Text delete button ─────────────────────────────────────────────────────── */
 
 .canvas-text-delete {
