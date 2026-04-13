@@ -298,14 +298,12 @@ export default function Canvas({
         saveHistory(fc)
       })
       fc.on('text:editing:entered', () => {
-        // If a modal handler is wired up, bail out of Fabric's built-in editing
-        // immediately. The modal was already opened from mouse:dblclick.
-        if (onTextEditRef.current) {
-          const obj = fc.getActiveObject()
-          if (obj instanceof fabric.Textbox) {
-            ;(obj as fabric.Textbox).exitEditing()
-            fc.renderAll()
-          }
+        const obj = fc.getActiveObject()
+        if (obj instanceof fabric.Textbox && onTextEditRef.current) {
+          // Exit Fabric's built-in cursor editing and open the modal instead
+          ;(obj as fabric.Textbox).exitEditing()
+          fc.renderAll()
+          onTextEditRef.current(obj as fabric.Textbox, side)
           return
         }
         setTextEditing(true)
@@ -393,16 +391,9 @@ export default function Canvas({
         )
       })
 
-      // ── Double-click: textbox → modal | photo → pan mode ────────────────
+      // ── Double-click: photo → pan mode (textbox is handled via text:editing:entered)
       fc.on('mouse:dblclick', (e) => {
         const obj = fc.findTarget(e.e)
-
-        if (obj instanceof fabric.Textbox && onTextEditRef.current) {
-          // Open the text edit modal instead of Fabric's built-in editing.
-          // exitEditing() is also called in text:editing:entered as a safety net.
-          onTextEditRef.current(obj as fabric.Textbox, side)
-          return
-        }
 
         if (obj && (obj as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
           isPanMode.current    = true   // FIRST — before any Fabric property changes
@@ -711,8 +702,9 @@ export default function Canvas({
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread)
-  const goLeft  = () => onSpreadChange(Math.max(0, currentSpread - 1))
-  const goRight = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
+  const goLeft      = () => onSpreadChange(Math.max(0, currentSpread - 1))
+  const goRight     = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
+  const isLastSpread = currentSpread === totalSpreads - 1
 
   // ── Render ────────────────────────────────────────────────────────────────
   const scaledW = SPREAD_W * zoom
@@ -745,6 +737,11 @@ export default function Canvas({
                 >
                   <canvas ref={leftElRef} />
                   {showBleed && <BleedOverlay />}
+                  {isLastSpread && (
+                    <div className="canvas-logo-overlay" aria-hidden="true">
+                      <img src="/LogoZeika.jpg" alt="Zeika Memories" className="canvas-logo-img" />
+                    </div>
+                  )}
                   {textSel?.side === 'left' && !textEditing && (
                     <button
                       className="canvas-text-delete"

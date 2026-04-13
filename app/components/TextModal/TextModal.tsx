@@ -10,10 +10,15 @@ import './TextModal.css'
 // ─── Font options ────────────────────────────────────────────────────────────
 
 export const TEXT_FONTS = [
-  { label: 'Amandine',         value: 'amandine' },
-  { label: 'Overused Grotesk', value: 'OverusedGrotesk' },
-  { label: 'Georgia',          value: 'Georgia' },
-  { label: 'Helvetica',        value: 'Helvetica' },
+  { label: 'Amandine',              value: 'amandine' },
+  { label: 'Costumed Hero',         value: 'CostumedHero' },
+  { label: 'Overused Grotesk',      value: 'OverusedGrotesk' },
+  { label: 'Helvetica Neue',        value: 'helvetica-neue-lt-pro' },
+  { label: 'Times New Roman',       value: 'Times New Roman' },
+  { label: 'Adobe Garamond Pro',    value: 'adobe-garamond-pro' },
+  { label: 'Century Old Style',     value: 'century-old-style-std' },
+  { label: 'Geller Headline',       value: 'geller-headline' },
+  { label: 'Handwriting Tiffany',   value: 'adobe-handwriting-tiffany' },
 ] as const
 
 // ─── Types ────────────────────────────────────────────────────────────────────

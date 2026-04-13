@@ -1,4 +1,11 @@
 @font-face {
+  font-family: 'CostumedHero';
+  src: url('/fonts/costumedherojnl 2.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
   font-family: 'OverusedGrotesk';
   src: url('/fonts/OverusedGrotesk-Roman.woff2') format('woff2');
   font-weight: 400;
