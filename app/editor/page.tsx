@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
+import JSZip from 'jszip'
 import * as fabric from 'fabric'
 
 import Topbar      from '../components/Topbar/Topbar'
@@ -19,7 +20,8 @@ import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 
 import { BOOK_SIZE }                                      from '../config/bookSize'
 import { applyLayout, addTextBox, serializePage,
-         deserializePage, dropPhotoOnFrame }              from '../components/Canvas/fabricHelpers'
+         deserializePage, dropPhotoOnFrame,
+         exportPageAsJpg }                                from '../components/Canvas/fabricHelpers'
 import type { PageData }                                   from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
@@ -38,6 +40,9 @@ export default function EditorPage() {
 
   // ── View mode (editor vs spreads overview) ────────────────────────────────
   const [viewMode, setViewMode] = useState<'editor' | 'spreads'>('editor')
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  const [isExporting, setIsExporting] = useState(false)
 
   // ── Preview ────────────────────────────────────────────────────────────────
   const [previewOpen,     setPreviewOpen]     = useState(false)
@@ -581,6 +586,56 @@ export default function EditorPage() {
     setCurrentSpread(spreadIndex)
   }, [])
 
+  // ── Export JPG ─────────────────────────────────────────────────────────────
+  const handleExportJpg = useCallback(async () => {
+    setIsExporting(true)
+    saveCurrentSpread()
+
+    const zip = new JSZip()
+    const projectName = 'zeika-libro'
+    const folder = zip.folder(projectName)!
+
+    const blankPage = (): PageData => ({
+      background: '#FFFFFF', pageW: PAGE_W, pageH: PAGE_H, frames: [], texts: [],
+    })
+
+    // Mirrors PageStrip's buildSpreads: skips "Inside" (spread 1 left) and "Outside" (last spread right)
+    type PageExport = { spreadIndex: number; side: 'left' | 'right'; name: string }
+    const pageExports: PageExport[] = []
+
+    pageExports.push({ spreadIndex: 0, side: 'left',  name: 'contratapa' })
+    pageExports.push({ spreadIndex: 0, side: 'right', name: 'tapa' })
+    pageExports.push({ spreadIndex: 1, side: 'right', name: '01' })
+
+    for (let si = 2; si <= totalContentSpreads + 1; si++) {
+      const leftNum  = 2 * (si - 1)
+      const rightNum = leftNum + 1
+      pageExports.push({ spreadIndex: si, side: 'left',  name: String(leftNum).padStart(2, '0') })
+      pageExports.push({ spreadIndex: si, side: 'right', name: String(rightNum).padStart(2, '0') })
+    }
+
+    const lastIdx     = totalContentSpreads + 2
+    const lastLeftNum = totalContentSpreads * 2 + 2
+    pageExports.push({ spreadIndex: lastIdx, side: 'left', name: String(lastLeftNum).padStart(2, '0') })
+
+    for (const { spreadIndex, side, name } of pageExports) {
+      const spread  = spreadsData.current[spreadIndex]
+      const page    = spread?.[side] ?? blankPage()
+      const dataUrl = await exportPageAsJpg(page, PAGE_W, PAGE_H, 3.125)
+      const base64  = dataUrl.split(',')[1]
+      folder.file(`${name}.jpg`, base64, { base64: true })
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const link = document.createElement('a')
+    link.download = `${projectName}.zip`
+    link.href = URL.createObjectURL(blob)
+    link.click()
+    URL.revokeObjectURL(link.href)
+
+    setIsExporting(false)
+  }, [saveCurrentSpread, totalContentSpreads])
+
   // ── Preview ────────────────────────────────────────────────────────────────
   const handleOpenPreview = useCallback(() => {
     // Flush the current spread into spreadsData before snapshotting
@@ -595,7 +650,7 @@ export default function EditorPage() {
   return (
     <>
     <div className="editor-root">
-      <Topbar onPreview={handleOpenPreview} />
+      <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} isExporting={isExporting} />
 
       <div className="editor-body">
         {viewMode === 'spreads' ? (

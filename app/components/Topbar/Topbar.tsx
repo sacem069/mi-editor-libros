@@ -1,12 +1,31 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
 import './Topbar.css'
 import Image from 'next/image'
 import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
 
 interface TopbarProps {
   onPreview?: () => void
+  onExportJpg: () => void
+  isExporting: boolean
 }
 
-export default function Topbar({ onPreview }: TopbarProps) {
+export default function Topbar({ onPreview, onExportJpg, isExporting }: TopbarProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dropdownOpen) return
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [dropdownOpen])
+
   return (
     <div className="topbar">
       <Image
@@ -27,10 +46,33 @@ export default function Topbar({ onPreview }: TopbarProps) {
           <Share2 size={18} strokeWidth={1.5} />
           <span>Compartir</span>
         </button>
-        <button className="topbar-action-btn">
-          <ArrowDownToLine size={18} strokeWidth={1.5} />
-          <span>Guardar</span>
-        </button>
+
+        <div className="topbar-export-wrapper" ref={wrapperRef}>
+          <button
+            className="topbar-action-btn"
+            onClick={() => setDropdownOpen((v) => !v)}
+            disabled={isExporting}
+          >
+            <ArrowDownToLine size={18} strokeWidth={1.5} />
+            <span>{isExporting ? 'Exportando…' : 'Guardar'}</span>
+          </button>
+
+          {dropdownOpen && (
+            <div className="topbar-export-dropdown">
+              <button
+                className="topbar-export-option"
+                onClick={() => { setDropdownOpen(false); onExportJpg() }}
+              >
+                Exportar JPG
+              </button>
+              <button className="topbar-export-option topbar-export-option--disabled" disabled>
+                Exportar PDF
+                <span className="topbar-export-soon">próximamente</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <button className="topbar-action-btn" onClick={onPreview}>
           <Eye size={18} strokeWidth={1.5} />
           <span>Previsualizar</span>

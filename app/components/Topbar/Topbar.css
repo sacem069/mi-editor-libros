@@ -63,3 +63,55 @@
 .topbar-btn-primary:hover {
   opacity: 0.9;
 }
+
+/* ── Export dropdown ─────────────────────────────────────────────────────── */
+
+.topbar-export-wrapper {
+  position: relative;
+}
+
+.topbar-export-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-white);
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 160px;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.topbar-export-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  font-family: 'Overused Grotesk', sans-serif;
+  font-size: 13px;
+  color: #282828;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.topbar-export-option:hover:not(:disabled) {
+  background: var(--color-cream);
+}
+
+.topbar-export-option--disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+.topbar-export-soon {
+  font-size: 10px;
+  color: #bbb;
+  font-style: italic;
+}

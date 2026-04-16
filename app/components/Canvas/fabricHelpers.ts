@@ -398,6 +398,29 @@ export function serializePage(
   }
 }
 
+// ─── 7b. exportPageAsJpg ────────────────────────────────────────────────────
+
+export async function exportPageAsJpg(
+  pageData: PageData,
+  canvasWidth: number,
+  canvasHeight: number,
+  multiplier: number = 3.125,
+): Promise<string> {
+  const offscreen = new fabric.Canvas(null, {
+    width: canvasWidth,
+    height: canvasHeight,
+    backgroundColor: '#ffffff',
+  })
+  await deserializePage(offscreen, pageData, canvasWidth, canvasHeight)
+  const dataUrl = offscreen.toDataURL({
+    format: 'jpeg',
+    quality: 1,
+    multiplier,
+  })
+  offscreen.dispose()
+  return dataUrl
+}
+
 // ─── 7. deserializePage ─────────────────────────────────────────────────────
 
 export async function deserializePage(
