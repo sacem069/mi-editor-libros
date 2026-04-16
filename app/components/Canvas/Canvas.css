@@ -106,6 +106,17 @@
   margin-top: 52px; /* matches canvas-page-num height */
 }
 
+/* ─── Pan mode banner ────────────────────────────────────────────────────────── */
+
+.canvas-pan-banner {
+  text-align: center;
+  padding: 6px 0 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--color-blue);
+  letter-spacing: 0.2px;
+}
+
 /* ─── Navigation ─────────────────────────────────────────────────────────────── */
 
 .canvas-nav {

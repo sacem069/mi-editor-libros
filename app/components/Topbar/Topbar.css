@@ -105,3 +105,25 @@
   background: var(--color-cream);
 }
 
+/* ── Language toggle ─────────────────────────────────────────────────────── */
+
+.topbar-lang-toggle {
+  background: none;
+  border: 1px solid var(--color-blue);
+  color: var(--color-blue);
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-family: 'Overused Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.topbar-lang-toggle:hover {
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+

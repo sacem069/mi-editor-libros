@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import './Topbar.css'
 import Image from 'next/image'
 import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
+import { useLang } from '../../context/LanguageContext'
 
 interface TopbarProps {
   onPreview?: () => void
@@ -13,6 +14,7 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExporting }: TopbarProps) {
+  const { lang, t, toggleLang } = useLang()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -41,11 +43,11 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
       <div className="topbar-actions">
         <button className="topbar-action-btn">
           <Info size={18} strokeWidth={1.5} />
-          <span>Descripción</span>
+          <span>{t.description}</span>
         </button>
         <button className="topbar-action-btn">
           <Share2 size={18} strokeWidth={1.5} />
-          <span>Compartir</span>
+          <span>{t.share}</span>
         </button>
 
         <div className="topbar-export-wrapper" ref={wrapperRef}>
@@ -55,7 +57,7 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
             disabled={isExporting}
           >
             <ArrowDownToLine size={18} strokeWidth={1.5} />
-            <span>{isExporting ? 'Exportando…' : 'Guardar'}</span>
+            <span>{isExporting ? t.exporting : t.save}</span>
           </button>
 
           {dropdownOpen && (
@@ -64,13 +66,13 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
                 className="topbar-export-option"
                 onClick={() => { setDropdownOpen(false); onExportJpg() }}
               >
-                Exportar JPG
+                {t.exportJpg}
               </button>
               <button
                 className="topbar-export-option"
                 onClick={() => { setDropdownOpen(false); onExportPdf() }}
               >
-                Exportar PDF
+                {t.exportPdf}
               </button>
             </div>
           )}
@@ -78,11 +80,15 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
 
         <button className="topbar-action-btn" onClick={onPreview}>
           <Eye size={18} strokeWidth={1.5} />
-          <span>Previsualizar</span>
+          <span>{t.preview}</span>
         </button>
       </div>
 
-      <button className="topbar-btn-primary">Revisar y comprar</button>
+      <button className="topbar-lang-toggle" onClick={toggleLang} aria-label="Toggle language">
+        {lang.toUpperCase()}
+      </button>
+
+      <button className="topbar-btn-primary">{t.reviewAndBuy}</button>
     </div>
   )
 }

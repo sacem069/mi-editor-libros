@@ -26,6 +26,7 @@ import { applyLayout, addTextBox, serializePage,
 import type { PageData }                                   from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
+import { LanguageProvider } from '../context/LanguageContext'
 import './editor.css'
 
 const PAGE_W = BOOK_SIZE.widthPx   // 816
@@ -623,7 +624,7 @@ export default function EditorPage() {
       const spread  = spreadsData.current[spreadIndex]
       const page    = spread?.[side] ?? blankPage()
       const dataUrl = await exportPageAsJpg(page, PAGE_W, PAGE_H, 3.125)
-      const base64  = dataUrl.split(',')[1]
+      const base64  = dataUrl?.split(',')[1] ?? ''
       folder.file(`${name}.jpg`, base64, { base64: true })
     }
 
@@ -684,6 +685,7 @@ export default function EditorPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    <LanguageProvider>
     <>
     <div className="editor-root">
       <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} onExportPdf={handleExportPdf} isExporting={isExporting} />
@@ -782,5 +784,6 @@ export default function EditorPage() {
       />
     )}
     </>
+    </LanguageProvider>
   )
 }

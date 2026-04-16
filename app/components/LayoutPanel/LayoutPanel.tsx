@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { LAYOUTS, getLayoutsByCantidad } from '../../config/layouts'
 import type { Layout } from '../../config/layouts'
+import { useLang } from '../../context/LanguageContext'
 import './LayoutPanel.css'
 
 export type { Layout }
@@ -43,6 +44,7 @@ export default function LayoutPanel({
   onPhotoCountChange,
   onLayoutSelect,
 }: LayoutPanelProps) {
+  const { t } = useLang()
   const [displayFilter, setDisplayFilter] = useState<number | 'all'>(selectedPhotoCount)
 
   const layouts = displayFilter === 'all' ? LAYOUTS : getLayoutsByCantidad(displayFilter)
@@ -51,7 +53,7 @@ export default function LayoutPanel({
     <aside className="layout-panel">
       {/* ── Header ── */}
       <div className="layout-panel-header">
-        <span className="layout-panel-title">Layouts</span>
+        <span className="layout-panel-title">{t.layouts}</span>
         <div className="layout-panel-bar" />
       </div>
 
@@ -75,7 +77,7 @@ export default function LayoutPanel({
           className={`layout-all-btn${displayFilter === 'all' ? ' layout-all-btn--active' : ''}`}
           onClick={() => setDisplayFilter('all')}
         >
-          todos
+          {t.all}
         </button>
       </div>
 

@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
 import { X } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
-import { dropPhotoOnFrame, findFrameAtPoint, restoreEmptyFrame } from './fabricHelpers'
+import { dropPhotoOnFrame, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame } from './fabricHelpers'
+import { useLang } from '../../context/LanguageContext'
 import './Canvas.css'
 
 const PAGE_W = BOOK_SIZE.widthPx   // 816
@@ -41,8 +42,8 @@ interface CanvasProps {
   onViewModeChange: (mode: 'editor' | 'spreads') => void
 }
 
-function spreadLabel(spread: number, totalSpreads: number): { left: string; right: string } {
-  if (spread === 0) return { left: 'Contra', right: 'Tapa' }
+function spreadLabel(spread: number, totalSpreads: number, back: string, cover: string): { left: string; right: string } {
+  if (spread === 0) return { left: back, right: cover }
   if (spread === 1) return { left: 'Inside', right: '01' }
   if (spread === totalSpreads - 1) {
     const lastLeft = String((totalSpreads - 3) * 2 + 2).padStart(2, '0')
@@ -97,9 +98,12 @@ export default function Canvas({
   const rightFabric = useRef<fabric.Canvas | null>(null)
   const outerRef    = useRef<HTMLDivElement>(null)
 
+  const { t } = useLang()
+
   // ── Active page + drag-over visual state ─────────────────────────────────
-  const [activePage,   setActivePage]   = useState<'left' | 'right'>('left')
-  const [dragOverPage, setDragOverPage] = useState<'left' | 'right' | null>(null)
+  const [activePage,    setActivePage]    = useState<'left' | 'right'>('left')
+  const [dragOverPage,  setDragOverPage]  = useState<'left' | 'right' | null>(null)
+  const [panModeActive, setPanModeActive] = useState(false)
 
   // ── Selected textbox tracking (for delete button) ─────────────────────────
   type TextSel = { side: 'left' | 'right'; top: number; left: number; width: number } | null
@@ -258,6 +262,7 @@ export default function Canvas({
           panTargetRef.current = null
           fc.selection         = true
           fc.defaultCursor     = 'default'
+          setPanModeActive(false)
         }
       })
 
@@ -412,6 +417,7 @@ export default function Canvas({
           fc.selection     = false
           fc.defaultCursor = 'grab'
           fc.renderAll()
+          setPanModeActive(true)
         }
       })
 
@@ -623,6 +629,7 @@ export default function Canvas({
           isPanMode.current    = false
           panData.current      = null
           panTargetRef.current = null
+          setPanModeActive(false)
           ;[lc, rc].forEach(c => { c.selection = true; c.defaultCursor = 'default'; c.renderAll() })
         }
         return
@@ -633,30 +640,37 @@ export default function Canvas({
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
       for (const fc of [lc, rc]) {
-        const obj = fc.getActiveObject()
-        if (!obj) continue
+        // .slice() makes a snapshot — getActiveObjects() returns Fabric's internal
+        // mutable array which discardActiveObject() clears in-place
+        const selected = fc.getActiveObjects().slice()
+        if (selected.length === 0) continue
 
-        if (obj instanceof fabric.Textbox) {
-          if ((obj as fabric.Textbox).isEditing) return
-          fc.remove(obj); fc.renderAll(); setTextSel(null)
-          return
+        if (selected.some(o => o instanceof fabric.Textbox && (o as fabric.Textbox).isEditing)) return
+
+        type FrameCoords = { frameX: number; frameY: number; frameW: number; frameH: number }
+        const framesToRestore: FrameCoords[] = []
+        let hasText = false
+
+        for (const obj of selected) {
+          if (obj instanceof fabric.Textbox) { hasText = true; continue }
+          const data = (obj as fabric.FabricObject & { data?: { type: string } & FrameCoords }).data
+          // Deep-copy coords before discard mutates anything
+          if (data?.type === 'photo') framesToRestore.push({ frameX: data.frameX, frameY: data.frameY, frameW: data.frameW, frameH: data.frameH })
         }
 
-        const data = (obj as fabric.FabricObject & {
-          data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number }
-        }).data
+        // Discard the ActiveSelection — releases objects back to canvas._objects
+        fc.discardActiveObject()
 
-        if (data?.type === 'photo') {
-          if (isPanMode.current) { isPanMode.current = false; panData.current = null; panTargetRef.current = null; fc.defaultCursor = 'default' }
-          restoreEmptyFrame(fc, data)
-          fc.remove(obj); fc.discardActiveObject(); fc.renderAll()
-          return
-        }
+        // Remove each object individually (spread on a potentially-empty ref is unsafe)
+        for (const obj of selected) fc.remove(obj)
 
-        if (data?.type === 'frame') {
-          fc.remove(obj); fc.discardActiveObject(); fc.renderAll()
-          return
+        if (hasText) setTextSel(null)
+        if (framesToRestore.length > 0 && isPanMode.current) {
+          isPanMode.current = false; panData.current = null; panTargetRef.current = null; fc.defaultCursor = 'default'
         }
+        for (const fd of framesToRestore) restoreEmptyFrame(fc, fd)
+        fc.renderAll()
+        return
       }
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -689,9 +703,18 @@ export default function Canvas({
       const rect  = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
       const x     = (e.clientX - rect.left) / zoomRef.current
       const y     = (e.clientY - rect.top)  / zoomRef.current
+
       const frame = findFrameAtPoint(fc, x, y)
       if (frame) {
         await dropPhotoOnFrame(fc, frame as fabric.Rect, photoUrl, PAGE_W, PAGE_H)
+        const photoId = e.dataTransfer.getData('application/zeika-photo-id')
+        if (photoId) onPhotoDropRef.current(photoId)
+        return
+      }
+
+      const existingPhoto = findPhotoAtPoint(fc, x, y)
+      if (existingPhoto) {
+        await replacePhotoInFrame(fc, existingPhoto, photoUrl)
         const photoId = e.dataTransfer.getData('application/zeika-photo-id')
         if (photoId) onPhotoDropRef.current(photoId)
       }
@@ -710,7 +733,7 @@ export default function Canvas({
   const handleDragLeave = useCallback(() => setDragOverPage(null), [])
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread, totalSpreads)
+  const { left: leftLabel, right: rightLabel } = spreadLabel(currentSpread, totalSpreads, t.back, t.cover)
   const goLeft      = () => onSpreadChange(Math.max(0, currentSpread - 1))
   const goRight     = () => onSpreadChange(Math.min(totalSpreads - 1, currentSpread + 1))
   const isLastSpread    = currentSpread === totalSpreads - 1
@@ -816,6 +839,11 @@ export default function Canvas({
               </div>
             </div>
 
+            {/* Pan mode banner */}
+            {panModeActive && (
+              <div className="canvas-pan-banner">{t.editingPhoto}</div>
+            )}
+
             {/* Navigation */}
             <div className="canvas-nav">
               <button className="canvas-nav-arrow" onClick={goLeft}  disabled={currentSpread === 0}               aria-label="Página anterior">{'<'}</button>
@@ -824,7 +852,7 @@ export default function Canvas({
                   ? 'Portada'
                   : currentSpread === totalSpreads - 1
                   ? 'Contratapa'
-                  : `Página ${currentSpread}`}
+                  : `${t.page} ${currentSpread}`}
               </span>
               <button className="canvas-nav-arrow" onClick={goRight} disabled={currentSpread === totalSpreads - 1} aria-label="Página siguiente">{'>'}</button>
             </div>

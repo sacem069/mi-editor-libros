@@ -2,6 +2,7 @@
 
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { CirclePlus, ListFilter, Check, Trash2 } from 'lucide-react'
+import { useLang } from '../../context/LanguageContext'
 import './PhotoPanel.css'
 
 export type Photo = {
@@ -30,6 +31,7 @@ export default function PhotoPanel({
   onPhotoClick,
   onDelete,
 }: PhotoPanelProps) {
+  const { t } = useLang()
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const filterWrapRef = useRef<HTMLDivElement>(null)
 
@@ -155,7 +157,7 @@ export default function PhotoPanel({
       <div className="photo-panel-actions">
         <button className="photo-action-btn" onClick={openFilePicker}>
           <CirclePlus size={24} strokeWidth={1.5} />
-          <span>Subir fotos</span>
+          <span>{t.uploadPhoto}</span>
         </button>
 
         {/* Filter button + dropdown */}
@@ -165,7 +167,7 @@ export default function PhotoPanel({
             onClick={() => setFilterOpen((v) => !v)}
           >
             <ListFilter size={24} strokeWidth={1.5} />
-            <span>Ordenar / Filtrar</span>
+            <span>{t.orderFilter}</span>
           </button>
 
           {filterOpen && (
@@ -221,7 +223,7 @@ export default function PhotoPanel({
 
       {/* ── Contador ── */}
       <div className="photo-panel-counter">
-        {photos.length} fotos
+        {photos.length} {t.photos.toLowerCase()}
       </div>
 
       {/* ── Separator bar ── */}

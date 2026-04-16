@@ -1,6 +1,7 @@
 'use client'
 
 import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler } from 'lucide-react'
+import { useLang } from '../../context/LanguageContext'
 import './Toolbar.css'
 
 interface ToolbarProps {
@@ -22,6 +23,7 @@ export default function Toolbar({
   onToggleBleed,
   onAddText,
 }: ToolbarProps) {
+  const { t } = useLang()
   return (
     <div className="toolbar">
       <div className="toolbar-group">
@@ -64,19 +66,19 @@ export default function Toolbar({
         <button
           className="toolbar-btn"
           onClick={onAddText}
-          aria-label="Texto"
+          aria-label={t.text}
         >
           <Type size={22} strokeWidth={1.5} />
-          <span className="toolbar-tooltip">Texto</span>
+          <span className="toolbar-tooltip">{t.text}</span>
         </button>
 
         <button
           className={`toolbar-btn${showBleed ? ' toolbar-btn--active' : ''}`}
           onClick={onToggleBleed}
-          aria-label="Guías"
+          aria-label={t.guides}
         >
           <Ruler size={22} strokeWidth={1.5} />
-          <span className="toolbar-tooltip">Guías</span>
+          <span className="toolbar-tooltip">{t.guides}</span>
         </button>
       </div>
     </div>

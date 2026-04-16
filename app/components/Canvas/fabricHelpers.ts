@@ -90,12 +90,7 @@ export function createEmptyFrame(
     strokeUniform:   true,
     selectable:    true,
     evented:       true,
-    lockMovementX: true,
-    lockMovementY: true,
-    lockScalingX:  true,
-    lockScalingY:  true,
     lockRotation:  true,
-    hoverCursor:   'default',
   }) as fabric.Rect & { data: FrameData }
 
   rect.data = {
@@ -132,12 +127,7 @@ export function restoreEmptyFrame(
     strokeUniform:   true,
     selectable:    true,
     evented:       true,
-    lockMovementX: true,
-    lockMovementY: true,
-    lockScalingX:  true,
-    lockScalingY:  true,
     lockRotation:  true,
-    hoverCursor:   'default',
   }) as fabric.Rect & { data: FrameData }
 
   rect.data = {
@@ -274,6 +264,81 @@ export function findFrameAtPoint(
   return null
 }
 
+// ─── 4b. findPhotoAtPoint ────────────────────────────────────────────────────
+
+export function findPhotoAtPoint(
+  canvas: fabric.Canvas,
+  x: number,
+  y: number,
+): (fabric.FabricImage & { data: PhotoData }) | null {
+  const photos = canvas.getObjects().filter(isPhotoObj)
+
+  for (const obj of photos) {
+    const pd = (obj as FabricObjectWithData).data as PhotoData
+    if (
+      x >= pd.frameX && x <= pd.frameX + pd.frameW &&
+      y >= pd.frameY && y <= pd.frameY + pd.frameH
+    ) {
+      return obj as fabric.FabricImage & { data: PhotoData }
+    }
+  }
+
+  return null
+}
+
+// ─── 4c. replacePhotoInFrame ─────────────────────────────────────────────────
+
+export async function replacePhotoInFrame(
+  canvas: fabric.Canvas,
+  existingPhoto: fabric.FabricImage & { data: PhotoData },
+  newPhotoSrc: string,
+): Promise<void> {
+  const { frameX, frameY, frameW, frameH } = existingPhoto.data
+
+  const img = await fabric.FabricImage.fromURL(newPhotoSrc, { crossOrigin: 'anonymous' })
+
+  const naturalW = img.width  || img.getScaledWidth()
+  const naturalH = img.height || img.getScaledHeight()
+  const scale    = Math.max(frameW / naturalW, frameH / naturalH)
+  const virtW    = frameW / scale
+  const virtH    = frameH / scale
+
+  img.set({
+    originX:           'center',
+    originY:           'center',
+    left:              frameX + frameW / 2,
+    top:               frameY + frameH / 2,
+    scaleX:            scale,
+    scaleY:            scale,
+    width:             virtW,
+    height:            virtH,
+    selectable:        true,
+    evented:           true,
+    borderColor:       '#528ED6',
+    borderScaleFactor: 2,
+  })
+
+  img.clipPath = makeClipRect(frameX, frameY, frameW, frameH)
+  img.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
+
+  ;(img as unknown as fabric.FabricObject & { data: PhotoData }).data = {
+    type:    'photo',
+    frameX,
+    frameY,
+    frameW,
+    frameH,
+    naturalW,
+    naturalH,
+    imgLeft: frameX + frameW / 2,
+    imgTop:  frameY + frameH / 2,
+  }
+
+  canvas.remove(existingPhoto)
+  canvas.add(img)
+  canvas.setActiveObject(img)
+  canvas.renderAll()
+}
+
 // ─── 5. addTextBox ──────────────────────────────────────────────────────────
 
 export function addTextBox(
@@ -348,12 +413,12 @@ export function serializePage(
     const data = (obj as FabricObjectWithData).data
 
     if (data?.type === 'frame') {
-      const fd = data as FrameData
+      const br = obj.getBoundingRect()
       frames.push({
-        frameX:  fd.frameX,
-        frameY:  fd.frameY,
-        frameW:  fd.frameW,
-        frameH:  fd.frameH,
+        frameX:  br.left,
+        frameY:  br.top,
+        frameW:  br.width,
+        frameH:  br.height,
         isEmpty: true,
       })
     }
@@ -447,12 +512,7 @@ export async function deserializePage(
         strokeUniform:   true,
         selectable:    true,
         evented:       true,
-        lockMovementX: true,
-        lockMovementY: true,
-        lockScalingX:  true,
-        lockScalingY:  true,
         lockRotation:  true,
-        hoverCursor:   'default',
       }) as fabric.Rect & { data: FrameData }
 
       rect.data = {

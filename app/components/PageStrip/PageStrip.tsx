@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
+import { useLang } from '../../context/LanguageContext'
 import './PageStrip.css'
 
 interface PageStripProps {
@@ -17,12 +18,12 @@ interface PageStripProps {
 type PageInfo  = { label: string; special: boolean; cover?: boolean }
 type SpreadDef = { index: number; left: PageInfo; right: PageInfo }
 
-function buildSpreads(total: number): SpreadDef[] {
+function buildSpreads(total: number, back: string, cover: string): SpreadDef[] {
   const lastLeftNum = total * 2 + 2   // e.g. 13*2+2 = 28
 
   const items: SpreadDef[] = [
-    { index: 0, left:  { label: 'Contra', special: true, cover: true },
-                right: { label: 'Tapa',   special: true, cover: true } },
+    { index: 0, left:  { label: back,  special: true, cover: true },
+                right: { label: cover, special: true, cover: true } },
     { index: 1, left:  { label: 'Inside', special: true },
                 right: { label: '01',     special: false } },
   ]
@@ -56,7 +57,8 @@ export default function PageStrip({
   onLayoutDrop,
   thumbnails,
 }: PageStripProps) {
-  const spreads    = buildSpreads(totalContentSpreads)
+  const { t } = useLang()
+  const spreads    = buildSpreads(totalContentSpreads, t.back, t.cover)
   const activeRef  = useRef<HTMLDivElement>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [hoverIndex, setHoverIndex]       = useState<number | null>(null)
