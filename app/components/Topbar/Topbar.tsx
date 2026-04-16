@@ -8,10 +8,11 @@ import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
 interface TopbarProps {
   onPreview?: () => void
   onExportJpg: () => void
+  onExportPdf: () => void
   isExporting: boolean
 }
 
-export default function Topbar({ onPreview, onExportJpg, isExporting }: TopbarProps) {
+export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExporting }: TopbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -65,9 +66,11 @@ export default function Topbar({ onPreview, onExportJpg, isExporting }: TopbarPr
               >
                 Exportar JPG
               </button>
-              <button className="topbar-export-option topbar-export-option--disabled" disabled>
+              <button
+                className="topbar-export-option"
+                onClick={() => { setDropdownOpen(false); onExportPdf() }}
+              >
                 Exportar PDF
-                <span className="topbar-export-soon">próximamente</span>
               </button>
             </div>
           )}

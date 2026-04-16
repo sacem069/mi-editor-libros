@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import JSZip from 'jszip'
+import { jsPDF } from 'jspdf'
 import * as fabric from 'fabric'
 
 import Topbar      from '../components/Topbar/Topbar'
@@ -636,6 +637,41 @@ export default function EditorPage() {
     setIsExporting(false)
   }, [saveCurrentSpread, totalContentSpreads])
 
+  // ── Export PDF ─────────────────────────────────────────────────────────────
+  const handleExportPdf = useCallback(async () => {
+    setIsExporting(true)
+    saveCurrentSpread()
+
+    const blankPage = (): PageData => ({
+      background: '#FFFFFF', pageW: PAGE_W, pageH: PAGE_H, frames: [], texts: [],
+    })
+
+    const pageWidthMm  = 432
+    const pageHeightMm = 280
+
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [pageWidthMm, pageHeightMm],
+    })
+
+    for (let i = 0; i < totalSpreads; i++) {
+      const spread = spreadsData.current[i]
+      const leftData  = spread?.left  ?? blankPage()
+      const rightData = spread?.right ?? blankPage()
+
+      const leftUrl  = await exportPageAsJpg(leftData,  PAGE_W, PAGE_H, 1)
+      const rightUrl = await exportPageAsJpg(rightData, PAGE_W, PAGE_H, 1)
+
+      if (i > 0) pdf.addPage()
+      pdf.addImage(leftUrl,  'JPEG', 0,                  0, pageWidthMm / 2, pageHeightMm)
+      pdf.addImage(rightUrl, 'JPEG', pageWidthMm / 2,    0, pageWidthMm / 2, pageHeightMm)
+    }
+
+    pdf.save('zeika-libro.pdf')
+    setIsExporting(false)
+  }, [saveCurrentSpread, totalSpreads])
+
   // ── Preview ────────────────────────────────────────────────────────────────
   const handleOpenPreview = useCallback(() => {
     // Flush the current spread into spreadsData before snapshotting
@@ -650,7 +686,7 @@ export default function EditorPage() {
   return (
     <>
     <div className="editor-root">
-      <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} isExporting={isExporting} />
+      <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} onExportPdf={handleExportPdf} isExporting={isExporting} />
 
       <div className="editor-body">
         {viewMode === 'spreads' ? (

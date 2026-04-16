@@ -105,13 +105,3 @@
   background: var(--color-cream);
 }
 
-.topbar-export-option--disabled {
-  color: #999;
-  cursor: not-allowed;
-}
-
-.topbar-export-soon {
-  font-size: 10px;
-  color: #bbb;
-  font-style: italic;
-}
