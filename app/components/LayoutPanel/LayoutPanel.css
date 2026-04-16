@@ -72,6 +72,38 @@
   background: var(--color-cream);
 }
 
+/* ── Todos ───────────────────────────────────────────────────────────────── */
+
+.layout-all-row {
+  display: flex;
+  justify-content: center;
+  padding: 0 8px 10px;
+  flex-shrink: 0;
+}
+
+.layout-all-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
+  transition: color 0.12s;
+}
+
+.layout-all-btn:hover {
+  color: var(--color-black);
+}
+
+.layout-all-btn--active {
+  color: var(--color-blue);
+  font-weight: 600;
+}
+
 /* ── Layout grid ─────────────────────────────────────────────────────────── */
 
 .layout-grid {
@@ -85,14 +117,13 @@
 }
 
 .layout-thumb {
-  aspect-ratio: 816 / 1058;
   background: var(--color-white);
   border: 1px solid var(--color-black);
   border-radius: 0;
   cursor: pointer;
   padding: 0;
-  position: relative;
-  overflow: hidden;
+  display: block;
+  width: 100%;
   transition: border-color 0.15s;
 }
 
@@ -105,6 +136,12 @@
 }
 
 /* ── Thumbnail frames ────────────────────────────────────────────────────── */
+
+.layout-thumb-aspect {
+  position: relative;
+  width: 100%;
+  padding-bottom: calc(280 / 216 * 100%);
+}
 
 .layout-thumb-inner {
   position: absolute;

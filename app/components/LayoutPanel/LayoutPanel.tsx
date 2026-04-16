@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { LAYOUTS, getLayoutsByCantidad } from '../../config/layouts'
 import type { Layout } from '../../config/layouts'
 import './LayoutPanel.css'
@@ -17,19 +18,21 @@ const PHOTO_COUNTS = [1, 2, 3, 4, 5]
 
 function LayoutThumbnail({ layout }: { layout: Layout }) {
   return (
-    <div className="layout-thumb-inner">
-      {layout.frames.map((frame, i) => (
-        <div
-          key={i}
-          className="layout-thumb-frame"
-          style={{
-            left:   `${(frame.x * 100).toFixed(4)}%`,
-            top:    `${(frame.y * 100).toFixed(4)}%`,
-            width:  `${(frame.w * 100).toFixed(4)}%`,
-            height: `${(frame.h * 100).toFixed(4)}%`,
-          }}
-        />
-      ))}
+    <div className="layout-thumb-aspect">
+      <div className="layout-thumb-inner">
+        {layout.frames.map((frame, i) => (
+          <div
+            key={i}
+            className="layout-thumb-frame"
+            style={{
+              left:   `${(frame.x * 100).toFixed(4)}%`,
+              top:    `${(frame.y * 100).toFixed(4)}%`,
+              width:  `${(frame.w * 100).toFixed(4)}%`,
+              height: `${(frame.h * 100).toFixed(4)}%`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -40,7 +43,9 @@ export default function LayoutPanel({
   onPhotoCountChange,
   onLayoutSelect,
 }: LayoutPanelProps) {
-  const layouts = getLayoutsByCantidad(selectedPhotoCount)
+  const [displayFilter, setDisplayFilter] = useState<number | 'all'>(selectedPhotoCount)
+
+  const layouts = displayFilter === 'all' ? LAYOUTS : getLayoutsByCantidad(displayFilter)
 
   return (
     <aside className="layout-panel">
@@ -55,13 +60,23 @@ export default function LayoutPanel({
         {PHOTO_COUNTS.map((count) => (
           <button
             key={count}
-            className={`layout-count-btn${selectedPhotoCount === count ? ' layout-count-btn--active' : ''}`}
-            onClick={() => onPhotoCountChange(count)}
+            className={`layout-count-btn${displayFilter === count ? ' layout-count-btn--active' : ''}`}
+            onClick={() => { onPhotoCountChange(count); setDisplayFilter(count) }}
             aria-label={`${count} foto${count > 1 ? 's' : ''}`}
           >
             {count}
           </button>
         ))}
+      </div>
+
+      {/* ── Todos ── */}
+      <div className="layout-all-row">
+        <button
+          className={`layout-all-btn${displayFilter === 'all' ? ' layout-all-btn--active' : ''}`}
+          onClick={() => setDisplayFilter('all')}
+        >
+          todos
+        </button>
       </div>
 
       {/* ── Grid de layouts ── */}

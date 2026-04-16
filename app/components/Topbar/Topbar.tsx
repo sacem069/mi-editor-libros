@@ -12,8 +12,8 @@ export default function Topbar({ onPreview }: TopbarProps) {
       <Image
         src="/LogoZeika.png"
         alt="Zeika"
-        width={33}
-        height={33}
+        width={44}
+        height={44}
       />
 
       <div className="topbar-spacer" />
