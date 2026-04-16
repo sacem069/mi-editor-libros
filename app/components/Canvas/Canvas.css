@@ -73,7 +73,7 @@
 
 .canvas-page-wrap {
   position: relative;
-  border: 1px solid #000;
+  border: 1px solid #CFCFCF;
   background: #ffffff;
   line-height: 0;
   transition: border-color 0.1s;
@@ -233,6 +233,45 @@
   white-space: nowrap;
   z-index: 10;
   letter-spacing: 0.2px;
+}
+
+/* ─── View toggle ────────────────────────────────────────────────────────────── */
+
+.canvas-view-toggle {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  display: flex;
+  z-index: 20;
+}
+
+.canvas-view-btn {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #474747;
+  background: #f0f0f0;
+  cursor: pointer;
+  color: #474747;
+  padding: 0;
+  transition: background 0.1s;
+}
+
+.canvas-view-btn:first-child {
+  border-radius: 2px 0 0 2px;
+  border-right: none;
+}
+
+.canvas-view-btn:last-child {
+  border-radius: 0 2px 2px 0;
+}
+
+.canvas-view-btn--active {
+  background: #fefefe;
+  border-color: #191919;
+  color: #191919;
 }
 
 /* ─── Zoom badge ─────────────────────────────────────────────────────────────── */

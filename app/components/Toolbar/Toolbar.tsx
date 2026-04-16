@@ -29,60 +29,54 @@ export default function Toolbar({
           className="toolbar-btn"
           onClick={onRedo}
           disabled={!canRedo}
-          title="Rehacer"
           aria-label="Rehacer"
         >
-          <Redo2 size={18} strokeWidth={1.5} />
-          <span>Rehacer</span>
+          <Redo2 size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Rehacer</span>
         </button>
 
         <button
           className="toolbar-btn"
           onClick={onUndo}
           disabled={!canUndo}
-          title="Deshacer"
           aria-label="Deshacer"
         >
-          <Undo2 size={18} strokeWidth={1.5} />
-          <span>Deshacer</span>
+          <Undo2 size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Deshacer</span>
         </button>
 
         <button
           className="toolbar-btn"
-          title="Formas"
           aria-label="Formas"
         >
-          <Shapes size={18} strokeWidth={1.5} />
-          <span>Formas</span>
+          <Shapes size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Formas</span>
         </button>
 
         <button
           className="toolbar-btn"
-          title="Marco foto"
           aria-label="Marco foto"
         >
-          <ImageUpscale size={18} strokeWidth={1.5} />
-          <span>Marco foto</span>
+          <ImageUpscale size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Marco foto</span>
         </button>
 
         <button
           className="toolbar-btn"
           onClick={onAddText}
-          title="Texto"
           aria-label="Texto"
         >
-          <Type size={18} strokeWidth={1.5} />
-          <span>Texto</span>
+          <Type size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Texto</span>
         </button>
 
         <button
           className={`toolbar-btn${showBleed ? ' toolbar-btn--active' : ''}`}
           onClick={onToggleBleed}
-          title="Guías de sangrado"
           aria-label="Guías"
         >
-          <Ruler size={18} strokeWidth={1.5} />
-          <span>Guías</span>
+          <Ruler size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Guías</span>
         </button>
       </div>
     </div>

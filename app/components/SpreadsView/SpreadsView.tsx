@@ -1,0 +1,151 @@
+'use client'
+
+import { useState, useRef } from 'react'
+import './SpreadsView.css'
+
+interface SpreadsViewProps {
+  thumbnails: Record<number, { left: string; right: string }>
+  totalSpreads: number
+  currentSpread: number
+  viewMode: 'editor' | 'spreads'
+  onSpreadSelect: (spread: number) => void
+  onViewModeChange: (mode: 'editor' | 'spreads') => void
+  onReorderSpreads: (fromIndex: number, toIndex: number) => void
+}
+
+function spreadLabel(spread: number, totalSpreads: number): { left: string; right: string } {
+  if (spread === 0) return { left: 'Contra', right: 'Tapa' }
+  if (spread === 1) return { left: 'Interna', right: '01' }
+  if (spread === totalSpreads - 1) {
+    const lastLeft = String((totalSpreads - 3) * 2 + 2).padStart(2, '0')
+    return { left: lastLeft, right: 'Interna' }
+  }
+  const leftNum  = 2 * (spread - 1)
+  const rightNum = leftNum + 1
+  return { left: String(leftNum).padStart(2, '0'), right: String(rightNum).padStart(2, '0') }
+}
+
+export default function SpreadsView({
+  thumbnails,
+  totalSpreads,
+  currentSpread,
+  viewMode,
+  onSpreadSelect,
+  onViewModeChange,
+  onReorderSpreads,
+}: SpreadsViewProps) {
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  // Prevents click from firing after a drag completes
+  const hasDraggedRef = useRef(false)
+
+  const handleDragStart = (e: React.DragEvent, i: number) => {
+    hasDraggedRef.current = false
+    setDraggingIdx(i)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragEnter = (i: number) => {
+    if (draggingIdx === null || draggingIdx === i) return
+    setDragOverIdx(i)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = (e: React.DragEvent, i: number) => {
+    e.preventDefault()
+    if (draggingIdx === null || draggingIdx === i) return
+    hasDraggedRef.current = true
+    onReorderSpreads(draggingIdx, i)
+    setDraggingIdx(null)
+    setDragOverIdx(null)
+  }
+
+  const handleDragEnd = () => {
+    hasDraggedRef.current = true
+    setDraggingIdx(null)
+    setDragOverIdx(null)
+  }
+
+  return (
+    <div className="spreads-root">
+
+      {/* ── View toggle ── */}
+      <div className="spreads-view-toggle">
+        <button
+          className={`spreads-view-btn${viewMode === 'editor' ? ' spreads-view-btn--active' : ''}`}
+          onClick={() => onViewModeChange('editor')}
+          aria-label="Vista de edición"
+        >
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="16" height="11" rx="1.5" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </button>
+        <button
+          className={`spreads-view-btn${viewMode === 'spreads' ? ' spreads-view-btn--active' : ''}`}
+          onClick={() => onViewModeChange('spreads')}
+          aria-label="Vista de spreads"
+        >
+          <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="9.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="0.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="9.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* ── Spreads grid ── */}
+      <div className="spreads-scroll">
+        <div className="spreads-grid-wrapper">
+          <div className="spreads-grid">
+            {Array.from({ length: totalSpreads }, (_, i) => {
+              const { left: leftLbl, right: rightLbl } = spreadLabel(i, totalSpreads)
+              const thumb = thumbnails[i]
+              const isActive   = i === currentSpread
+              const isDragging = i === draggingIdx
+              const isDragOver = i === dragOverIdx && draggingIdx !== null && draggingIdx !== i
+
+              return (
+                <div
+                  key={i}
+                  className={[
+                    'spreads-card',
+                    isActive   ? 'spreads-card--active'   : '',
+                    isDragging ? 'spreads-card--dragging' : '',
+                    isDragOver ? 'spreads-card--drag-over' : '',
+                  ].filter(Boolean).join(' ')}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, i)}
+                  onDragEnter={() => handleDragEnter(i)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, i)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => { if (!hasDraggedRef.current) onSpreadSelect(i); hasDraggedRef.current = false }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && onSpreadSelect(i)}
+                  aria-label={`Spread ${leftLbl} – ${rightLbl}`}
+                  aria-current={isActive ? 'true' : undefined}
+                >
+                  <div className="spreads-card-label">
+                    <span>{leftLbl}</span>
+                    <span>{rightLbl}</span>
+                  </div>
+                  <div className="spreads-card-pages">
+                    {thumb?.left  ? <img className="spreads-card-page" src={thumb.left}  alt={leftLbl}  draggable={false} /> : <div className="spreads-card-page spreads-card-page--blank" />}
+                    {thumb?.right ? <img className="spreads-card-page" src={thumb.right} alt={rightLbl} draggable={false} /> : <div className="spreads-card-page spreads-card-page--blank" />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  )
+}

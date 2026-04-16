@@ -1,0 +1,160 @@
+/* ─── Root ───────────────────────────────────────────────────────────────────── */
+
+.spreads-root {
+  flex: 1;
+  position: relative;
+  background: #efefef;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ─── View toggle — fixed top-right regardless of scroll ─────────────────────── */
+
+.spreads-view-toggle {
+  position: absolute;
+  top: 52px;
+  right: 216px;
+  display: flex;
+  z-index: 20;
+}
+
+.spreads-view-btn {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #474747;
+  background: #f0f0f0;
+  cursor: pointer;
+  color: #474747;
+  padding: 0;
+  transition: background 0.1s;
+}
+
+.spreads-view-btn:first-child {
+  border-radius: 2px 0 0 2px;
+  border-right: none;
+}
+
+.spreads-view-btn:last-child {
+  border-radius: 0 2px 2px 0;
+}
+
+.spreads-view-btn--active {
+  background: #fefefe;
+  border-color: #191919;
+  color: #191919;
+}
+
+/* ─── Scrollable area — centers the 70% grid ────────────────────────────────── */
+
+.spreads-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 110px;
+}
+
+/* ─── 55% width wrapper ──────────────────────────────────────────────────────── */
+
+.spreads-grid-wrapper {
+  width: 55%;
+  margin: 0 auto;
+  padding-bottom: 120px;
+}
+
+/* ─── Grid: 4 columns ────────────────────────────────────────────────────────── */
+
+.spreads-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 36px 32px;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────────── */
+
+.spreads-card {
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  outline: none;
+  position: relative;
+  transition: opacity 0.15s;
+}
+
+.spreads-card:active {
+  cursor: grabbing;
+}
+
+.spreads-card:focus-visible .spreads-card-pages {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+/* Being dragged — fade out the source card */
+.spreads-card--dragging {
+  opacity: 0.35;
+}
+
+/* Drop target — blue insertion line on the left */
+.spreads-card--drag-over::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-blue);
+  border-radius: 2px;
+}
+
+/* Labels: left page number on the left, right page number on the right */
+.spreads-card-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-black);
+  padding: 0 1px;
+  user-select: none;
+}
+
+/* Spread pages container — two pages side by side, landscape proportions */
+.spreads-card-pages {
+  display: flex;
+  border: 1px solid #c4c4c4;
+  border-radius: 1px;
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.12s;
+}
+
+.spreads-card:hover .spreads-card-pages {
+  border-color: #999;
+}
+
+.spreads-card--active .spreads-card-pages,
+.spreads-card--active:hover .spreads-card-pages {
+  border: 2px solid var(--color-blue);
+  transition: none;
+}
+
+/* Each page: portrait aspect ratio 816:1058 ≈ 77:100 */
+.spreads-card-page {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  aspect-ratio: 816 / 1058;
+  object-fit: cover;
+}
+
+.spreads-card-page--blank {
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 816 / 1058;
+  background: #ffffff;
+}

@@ -4,7 +4,7 @@
   width: 220px;
   flex-shrink: 0;
   background: #fefefe;
-  border-right: 1px solid #000;
+  border-right: 1px solid #CFCFCF;
   display: flex;
   flex-direction: column;
   overflow: hidden;

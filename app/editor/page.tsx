@@ -8,6 +8,7 @@ import Topbar      from '../components/Topbar/Topbar'
 import Toolbar     from '../components/Toolbar/Toolbar'
 import TextModal, { type TextOpts } from '../components/TextModal/TextModal'
 import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
+import SpreadsView from '../components/SpreadsView/SpreadsView'
 // Canvas uses Fabric.js (browser-only). Dynamic import with ssr:false prevents
 // Next.js from attempting to server-render it, eliminating all hydration errors.
 const Canvas       = dynamic(() => import('../components/Canvas/Canvas'),             { ssr: false })
@@ -34,6 +35,9 @@ type SpreadSnapshot = { left: PageData; right: PageData }
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function EditorPage() {
+
+  // ── View mode (editor vs spreads overview) ────────────────────────────────
+  const [viewMode, setViewMode] = useState<'editor' | 'spreads'>('editor')
 
   // ── Preview ────────────────────────────────────────────────────────────────
   const [previewOpen,     setPreviewOpen]     = useState(false)
@@ -534,6 +538,49 @@ export default function EditorPage() {
     // futuro: mostrar propiedades en toolbar
   }, [])
 
+  // ── View mode toggle ──────────────────────────────────────────────────────
+  const handleViewModeChange = useCallback((mode: 'editor' | 'spreads') => {
+    if (mode === 'spreads') saveCurrentSpread()
+    setViewMode(mode)
+  }, [saveCurrentSpread])
+
+  // ── Reorder spreads (drag & drop in SpreadsView) ─────────────────────────
+  const handleReorderSpreads = useCallback((fromIndex: number, toIndex: number) => {
+    // Save current canvas state first
+    saveCurrentSpread()
+
+    // Build new index order by moving fromIndex to toIndex
+    const order = Array.from({ length: totalSpreads }, (_, i) => i)
+    order.splice(toIndex, 0, order.splice(fromIndex, 1)[0])
+
+    // Remap spreadsData
+    const oldData = { ...spreadsData.current }
+    const newData: Record<number, SpreadSnapshot> = {}
+    order.forEach((oldIdx, newIdx) => {
+      if (oldData[oldIdx]) newData[newIdx] = oldData[oldIdx]
+    })
+    spreadsData.current = newData
+
+    // Remap thumbnails
+    setThumbnails((prev) => {
+      const next: Record<number, { left: string; right: string }> = {}
+      order.forEach((oldIdx, newIdx) => {
+        if (prev[oldIdx]) next[newIdx] = prev[oldIdx]
+      })
+      return next
+    })
+
+    // Select the dragged spread (it always lands at toIndex after the move)
+    currentSpreadRef.current = toIndex
+    setCurrentSpread(toIndex)
+  }, [totalSpreads, saveCurrentSpread])
+
+  // Highlight a spread in the overview — just updates selection, no view switch
+  const handleSpreadsViewSelect = useCallback((spreadIndex: number) => {
+    currentSpreadRef.current = spreadIndex
+    setCurrentSpread(spreadIndex)
+  }, [])
+
   // ── Preview ────────────────────────────────────────────────────────────────
   const handleOpenPreview = useCallback(() => {
     // Flush the current spread into spreadsData before snapshotting
@@ -551,57 +598,73 @@ export default function EditorPage() {
       <Topbar onPreview={handleOpenPreview} />
 
       <div className="editor-body">
-        <PhotoPanel
-          photos={photos}
-          usedPhotoIds={usedPhotoIds}
-          onUpload={handlePhotoUpload}
-          onPhotoClick={handlePhotoClick}
-          onDelete={handlePhotoDelete}
-        />
-
-        <div className="editor-center">
-          <Toolbar
-            canUndo={canUndo}
-            canRedo={canRedo}
-            showBleed={showBleed}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-            onToggleBleed={handleToggleBleed}
-            onAddText={handleAddText}
-          />
-
-          <Canvas
-            zoom={zoom}
-            showBleed={showBleed}
-            currentSpread={currentSpread}
-            totalSpreads={totalSpreads}
-            onObjectSelected={handleObjectSelected}
-            onCanvasReady={handleCanvasReady}
-            onSpreadChange={handleSpreadSelect}
-            onZoomChange={handleZoomChange}
-            onActivePageChange={handleActivePageChange}
-            onLayoutDropOnPage={handleLayoutDropOnPage}
-            onPhotoDrop={handlePhotoDrop}
-            onTextEdit={handleTextEdit}
-          />
-
-          <PageStrip
-            currentSpread={currentSpread}
-            totalContentSpreads={totalContentSpreads}
-            onSpreadSelect={handleSpreadSelect}
-            onAddSpread={handleAddSpread}
-            onDeleteSpread={handleDeleteSpread}
-            onLayoutDrop={handleLayoutDrop}
+        {viewMode === 'spreads' ? (
+          <SpreadsView
             thumbnails={thumbnails}
+            totalSpreads={totalSpreads}
+            currentSpread={currentSpread}
+            viewMode={viewMode}
+            onSpreadSelect={handleSpreadsViewSelect}
+            onViewModeChange={handleViewModeChange}
+            onReorderSpreads={handleReorderSpreads}
           />
-        </div>
+        ) : (
+          <>
+            <PhotoPanel
+              photos={photos}
+              usedPhotoIds={usedPhotoIds}
+              onUpload={handlePhotoUpload}
+              onPhotoClick={handlePhotoClick}
+              onDelete={handlePhotoDelete}
+            />
 
-        <LayoutPanel
-          selectedPhotoCount={selectedPhotoCount}
-          selectedLayoutId={selectedLayoutId}
-          onPhotoCountChange={setSelectedPhotoCount}
-          onLayoutSelect={handleLayoutSelect}
-        />
+            <div className="editor-center">
+              <Toolbar
+                canUndo={canUndo}
+                canRedo={canRedo}
+                showBleed={showBleed}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onToggleBleed={handleToggleBleed}
+                onAddText={handleAddText}
+              />
+
+              <Canvas
+                zoom={zoom}
+                showBleed={showBleed}
+                currentSpread={currentSpread}
+                totalSpreads={totalSpreads}
+                viewMode={viewMode}
+                onObjectSelected={handleObjectSelected}
+                onCanvasReady={handleCanvasReady}
+                onSpreadChange={handleSpreadSelect}
+                onZoomChange={handleZoomChange}
+                onActivePageChange={handleActivePageChange}
+                onLayoutDropOnPage={handleLayoutDropOnPage}
+                onPhotoDrop={handlePhotoDrop}
+                onTextEdit={handleTextEdit}
+                onViewModeChange={handleViewModeChange}
+              />
+
+              <PageStrip
+                currentSpread={currentSpread}
+                totalContentSpreads={totalContentSpreads}
+                onSpreadSelect={handleSpreadSelect}
+                onAddSpread={handleAddSpread}
+                onDeleteSpread={handleDeleteSpread}
+                onLayoutDrop={handleLayoutDrop}
+                thumbnails={thumbnails}
+              />
+            </div>
+
+            <LayoutPanel
+              selectedPhotoCount={selectedPhotoCount}
+              selectedLayoutId={selectedLayoutId}
+              onPhotoCountChange={setSelectedPhotoCount}
+              onLayoutSelect={handleLayoutSelect}
+            />
+          </>
+        )}
       </div>
     </div>
 

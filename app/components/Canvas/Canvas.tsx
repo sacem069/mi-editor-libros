@@ -29,6 +29,7 @@ interface CanvasProps {
   showBleed: boolean
   currentSpread: number
   totalSpreads: number
+  viewMode: 'editor' | 'spreads'
   onObjectSelected: (obj: fabric.FabricObject | null) => void
   onCanvasReady: (left: fabric.Canvas, right: fabric.Canvas) => void
   onSpreadChange: (spread: number) => void
@@ -37,6 +38,7 @@ interface CanvasProps {
   onLayoutDropOnPage: (layoutId: string, page: 'left' | 'right') => void
   onPhotoDrop: (photoId: string) => void
   onTextEdit?: (textbox: fabric.Textbox, side: 'left' | 'right') => void
+  onViewModeChange: (mode: 'editor' | 'spreads') => void
 }
 
 function spreadLabel(spread: number, totalSpreads: number): { left: string; right: string } {
@@ -78,6 +80,7 @@ export default function Canvas({
   showBleed,
   currentSpread,
   totalSpreads,
+  viewMode,
   onObjectSelected,
   onCanvasReady,
   onSpreadChange,
@@ -86,6 +89,7 @@ export default function Canvas({
   onLayoutDropOnPage,
   onPhotoDrop,
   onTextEdit,
+  onViewModeChange,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
@@ -826,6 +830,31 @@ export default function Canvas({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── View toggle ── */}
+      <div className="canvas-view-toggle">
+        <button
+          className={`canvas-view-btn${viewMode === 'editor' ? ' canvas-view-btn--active' : ''}`}
+          onClick={() => onViewModeChange('editor')}
+          aria-label="Vista de edición"
+        >
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="16" height="11" rx="1.5" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </button>
+        <button
+          className={`canvas-view-btn${viewMode === 'spreads' ? ' canvas-view-btn--active' : ''}`}
+          onClick={() => onViewModeChange('spreads')}
+          aria-label="Vista de spreads"
+        >
+          <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="9.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="0.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+            <rect x="9.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
+          </svg>
+        </button>
       </div>
 
       {/* ── Zoom badge ── */}
