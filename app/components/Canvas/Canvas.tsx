@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
 import { X } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
-import { dropPhotoOnFrame, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame } from './fabricHelpers'
+import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
 import './Canvas.css'
 
@@ -208,6 +208,14 @@ export default function Canvas({
           obj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
           obj.set({ borderColor: '#528ED6', borderScaleFactor: 2 })
         }
+        if (data?.type === 'text' && obj instanceof fabric.Textbox) {
+          obj.set({ lockUniScaling: false })
+          obj.setControlsVisibility({ mt: false, mb: false })
+        }
+        if (data?.type === 'freePhoto') {
+          obj.set({ lockUniScaling: true })
+          obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
+        }
       }
     }
 
@@ -292,13 +300,27 @@ export default function Canvas({
         setDragOverPage(null)
       })
 
+      const applyTextControls = (obj: fabric.FabricObject | undefined) => {
+        if (!obj) return
+        if (obj instanceof fabric.Textbox) {
+          obj.set({ lockUniScaling: false })
+          obj.setControlsVisibility({ mt: false, mb: false })
+        }
+        const data = (obj as fabric.FabricObject & { data?: { type: string } }).data
+        if (data?.type === 'freePhoto') {
+          obj.set({ lockUniScaling: true })
+          obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
+        }
+      }
       fc.on('selection:created', (e) => {
         onObjectSelectedRef.current(e.selected?.[0] ?? null)
         updateTextSel(e.selected?.[0], side)
+        applyTextControls(e.selected?.[0])
       })
       fc.on('selection:updated', (e) => {
         onObjectSelectedRef.current(e.selected?.[0] ?? null)
         updateTextSel(e.selected?.[0], side)
+        applyTextControls(e.selected?.[0])
       })
       fc.on('selection:cleared', () => {
         onObjectSelectedRef.current(null)
@@ -717,7 +739,13 @@ export default function Canvas({
         await replacePhotoInFrame(fc, existingPhoto, photoUrl)
         const photoId = e.dataTransfer.getData('application/zeika-photo-id')
         if (photoId) onPhotoDropRef.current(photoId)
+        return
       }
+
+      // No frame and no existing photo — drop as free-floating image
+      await dropPhotoFree(fc, photoUrl, x, y)
+      const photoId = e.dataTransfer.getData('application/zeika-photo-id')
+      if (photoId) onPhotoDropRef.current(photoId)
     },
     [],
   )

@@ -28,7 +28,13 @@ type TextData = {
   type: 'text'
 }
 
-type FabricObjectWithData = fabric.FabricObject & { data: FrameData | PhotoData | TextData }
+type FreePhotoData = {
+  type:    'freePhoto'
+  naturalW: number
+  naturalH: number
+}
+
+type FabricObjectWithData = fabric.FabricObject & { data: FrameData | PhotoData | TextData | FreePhotoData }
 
 // ─── Utilidades ─────────────────────────────────────────────────────────────
 
@@ -46,6 +52,10 @@ function isPhotoObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
 
 function isTextObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
   return (obj as FabricObjectWithData).data?.type === 'text'
+}
+
+function isFreePhotoObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
+  return (obj as FabricObjectWithData).data?.type === 'freePhoto'
 }
 
 // Build an absolutePositioned clipPath rect from frame coords.
@@ -339,6 +349,51 @@ export async function replacePhotoInFrame(
   canvas.renderAll()
 }
 
+// ─── 4d. dropPhotoFree ───────────────────────────────────────────────────────
+// Adds a free-floating image at (x, y) — no frame required.
+// Fits within MAX×MAX while preserving aspect ratio.
+
+const FREE_MAX = 400
+
+export async function dropPhotoFree(
+  canvas: fabric.Canvas,
+  photoSrc: string,
+  x: number,
+  y: number,
+): Promise<void> {
+  const img = await fabric.FabricImage.fromURL(photoSrc, { crossOrigin: 'anonymous' })
+
+  const naturalW = img.width  || img.getScaledWidth()
+  const naturalH = img.height || img.getScaledHeight()
+  const scale    = Math.min(FREE_MAX / naturalW, FREE_MAX / naturalH, 1)
+
+  img.set({
+    originX:           'center',
+    originY:           'center',
+    left:              x,
+    top:               y,
+    scaleX:            scale,
+    scaleY:            scale,
+    selectable:        true,
+    evented:           true,
+    borderColor:       '#528ED6',
+    borderScaleFactor: 2,
+  })
+
+  img.set({ lockUniScaling: true })
+  img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
+
+  ;(img as unknown as fabric.FabricObject & { data: FreePhotoData }).data = {
+    type:    'freePhoto',
+    naturalW,
+    naturalH,
+  }
+
+  canvas.add(img)
+  canvas.setActiveObject(img)
+  canvas.renderAll()
+}
+
 // ─── 5. addTextBox ──────────────────────────────────────────────────────────
 
 export function addTextBox(
@@ -359,6 +414,8 @@ export function addTextBox(
   }) as fabric.Textbox & { data: TextData }
 
   textbox.data = { type: 'text' }
+  textbox.set({ lockUniScaling: false })
+  textbox.setControlsVisibility({ mt: false, mb: false })
 
   canvas.add(textbox)
   canvas.setActiveObject(textbox)
@@ -393,12 +450,24 @@ type SerializedText = {
   fill: string
 }
 
+type SerializedFreePhoto = {
+  src:      string
+  left:     number
+  top:      number
+  scaleX:   number
+  scaleY:   number
+  angle:    number
+  naturalW: number
+  naturalH: number
+}
+
 export type PageData = {
-  background: string
-  pageW: number
-  pageH: number
-  frames: SerializedFrame[]
-  texts: SerializedText[]
+  background:  string
+  pageW:       number
+  pageH:       number
+  frames:      SerializedFrame[]
+  texts:       SerializedText[]
+  freePhotos?: SerializedFreePhoto[]
 }
 
 export function serializePage(
@@ -406,8 +475,9 @@ export function serializePage(
   pageW: number,
   pageH: number,
 ): PageData {
-  const frames: SerializedFrame[] = []
-  const texts: SerializedText[] = []
+  const frames:      SerializedFrame[]     = []
+  const texts:       SerializedText[]      = []
+  const freePhotos:  SerializedFreePhoto[] = []
 
   for (const obj of canvas.getObjects()) {
     const data = (obj as FabricObjectWithData).data
@@ -441,6 +511,20 @@ export function serializePage(
       })
     }
 
+    if (data?.type === 'freePhoto' && obj instanceof fabric.FabricImage) {
+      const fp = data as FreePhotoData
+      freePhotos.push({
+        src:      obj.getSrc(),
+        left:     obj.left     ?? 0,
+        top:      obj.top      ?? 0,
+        scaleX:   obj.scaleX   ?? 1,
+        scaleY:   obj.scaleY   ?? 1,
+        angle:    obj.angle    ?? 0,
+        naturalW: fp.naturalW,
+        naturalH: fp.naturalH,
+      })
+    }
+
     if (data?.type === 'text' && obj instanceof fabric.Textbox) {
       texts.push({
         text: obj.text ?? '',
@@ -460,6 +544,7 @@ export function serializePage(
     pageH,
     frames,
     texts,
+    freePhotos,
   }
 }
 
@@ -566,6 +651,31 @@ export async function deserializePage(
       }
       canvas.add(img)
     }
+  }
+
+  for (const fp of pageData.freePhotos ?? []) {
+    const img = await fabric.FabricImage.fromURL(fp.src, { crossOrigin: 'anonymous' })
+    img.set({
+      originX:           'center',
+      originY:           'center',
+      left:              fp.left,
+      top:               fp.top,
+      scaleX:            fp.scaleX,
+      scaleY:            fp.scaleY,
+      angle:             fp.angle,
+      selectable:        true,
+      evented:           true,
+      borderColor:       '#528ED6',
+      borderScaleFactor: 2,
+    })
+    img.set({ lockUniScaling: true })
+    img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
+    ;(img as unknown as fabric.FabricObject & { data: FreePhotoData }).data = {
+      type:    'freePhoto',
+      naturalW: fp.naturalW,
+      naturalH: fp.naturalH,
+    }
+    canvas.add(img)
   }
 
   for (const st of pageData.texts) {
