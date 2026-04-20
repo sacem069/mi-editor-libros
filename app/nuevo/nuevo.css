@@ -1,0 +1,424 @@
+/* ── Layout shell ─────────────────────────────────────────────────────────── */
+
+.nuevo-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-white);
+  font-family: var(--font-body);
+}
+
+/* ── Topbar ───────────────────────────────────────────────────────────────── */
+
+.nuevo-topbar {
+  height: 50px;
+  background: #fefefe;
+  border-bottom: 1px solid #cfcfcf;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nuevo-topbar-spacer   { flex: 1; }
+
+.nuevo-topbar-username {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  color: #282828;
+}
+
+.nuevo-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-blue);
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Body / content area ─────────────────────────────────────────────────── */
+
+.nuevo-body {
+  flex: 1;
+  padding: 80px 64px 32px 64px;
+  min-height: 0;
+}
+
+.nuevo-body--photos {
+  display: flex;
+  flex-direction: column;
+}
+
+.nuevo-step-title {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-black);
+  letter-spacing: 0.5px;
+  margin-bottom: 48px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.nuevo-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 64px 32px 64px;
+}
+
+.nuevo-btn {
+  padding: 9px 22px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.26px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.nuevo-btn--secondary {
+  background: #fcfcfc;
+  border: 1.5px solid #d9d9d9;
+  color: #282828;
+}
+
+.nuevo-btn--secondary:hover { opacity: 0.7; }
+
+.nuevo-btn--primary {
+  background: var(--color-blue);
+  border: 1.5px solid var(--color-blue);
+  color: var(--color-white);
+}
+
+.nuevo-btn--primary:hover:not(:disabled) { opacity: 0.88; }
+
+.nuevo-btn--primary:disabled {
+  background: #e0e0e0;
+  border-color: #d0d0d0;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+/* ── Step 1: size cards ───────────────────────────────────────────────────── */
+
+.nuevo-size-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
+.nuevo-size-card {
+  background: #eeeeee;
+  border: 1.5px solid #191919;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  transition: box-shadow 0.12s;
+  display: flex;
+  flex-direction: column;
+}
+
+.nuevo-size-card:not(.nuevo-size-card--selected):hover {
+  border-color: #93b8e4;
+}
+
+.nuevo-size-card--selected {
+  border: 2px solid var(--color-blue);
+  box-shadow: 0 0 0 1px var(--color-blue);
+}
+
+/* Image area: large, fills ~75% of the card */
+.nuevo-size-card-img-wrap {
+  width: 100%;
+  height: 240px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px 16px 16px;
+  flex-shrink: 0;
+}
+
+.nuevo-size-card-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.nuevo-size-card-img--vertical {
+  transform: scale(1.35);
+}
+
+/* Info section: name+dims above divider, price below */
+.nuevo-size-card-info {
+  padding: 10px 14px 16px 14px;
+}
+
+.nuevo-size-card-name-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.nuevo-size-card-name {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: #212121;
+  letter-spacing: 0.27px;
+}
+
+.nuevo-size-card-dims {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 400;
+  color: #464646;
+  letter-spacing: 0.18px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nuevo-size-card-divider {
+  height: 2px;
+  background: #c8c8c8;
+  margin: 0 0 8px 0;
+}
+
+.nuevo-size-card-price {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: #212121;
+  letter-spacing: 0.26px;
+}
+
+/* ── Step 2: form + preview ───────────────────────────────────────────────── */
+
+.nuevo-details-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 0;
+  align-items: start;
+}
+
+.nuevo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 420px;
+  margin-left: 120px;
+  margin-right: 80px;
+  margin-top: 60px;
+}
+
+.nuevo-field {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.nuevo-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  color: #303030;
+  letter-spacing: 0.27px;
+  white-space: nowrap;
+}
+
+.nuevo-input,
+.nuevo-select {
+  height: 34px;
+  background: #f3f3f3;
+  border: 1px solid #191919;
+  padding: 0 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  color: #191919;
+  width: 100%;
+  max-width: 300px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23191919' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.nuevo-input {
+  background-image: none;
+  cursor: text;
+}
+
+.nuevo-input:focus,
+.nuevo-select:focus {
+  outline: 2px solid var(--color-blue);
+  outline-offset: -1px;
+}
+
+/* Preview column: pushed to the right edge, pulled up to align with title */
+.nuevo-preview-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -62px;
+  width: 380px;
+}
+
+/* Preview card: same structure as Step 1, scaled up */
+.nuevo-preview-card {
+  background: #eeeeee;
+  border: 1.5px solid #191919;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scale up the shared card internals for the preview */
+.nuevo-preview-card .nuevo-size-card-img-wrap {
+  height: 350px;
+  padding: 20px 16px 16px 16px;
+}
+
+.nuevo-preview-card .nuevo-size-card-info {
+  padding: 12px 16px 18px 16px;
+}
+
+.nuevo-preview-card .nuevo-size-card-name-row {
+  margin-bottom: 10px;
+}
+
+.nuevo-preview-card .nuevo-size-card-name {
+  font-size: 24px;
+  letter-spacing: 0.45px;
+}
+
+.nuevo-preview-card .nuevo-size-card-dims {
+  font-size: 15px;
+  letter-spacing: 0.3px;
+}
+
+.nuevo-preview-card .nuevo-size-card-divider {
+  margin-bottom: 10px;
+}
+
+.nuevo-preview-card .nuevo-size-card-price {
+  font-size: 18px;
+  letter-spacing: 0.36px;
+}
+
+/* ── Step 3: photos ───────────────────────────────────────────────────────── */
+
+.nuevo-upload-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 80px 0;
+}
+
+.nuevo-upload-empty-text {
+  font-family: var(--font-body);
+  font-size: 18px;
+  font-weight: 400;
+  color: #1b1b1b;
+  letter-spacing: 0.44px;
+}
+
+.nuevo-upload-btn {
+  background: var(--color-blue);
+  color: var(--color-white);
+  border: none;
+  border-radius: 3px;
+  padding: 8px 24px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.nuevo-upload-btn:hover { opacity: 0.88; }
+
+.nuevo-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.nuevo-photo-thumb {
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  background: #d9d9d9;
+  position: relative;
+}
+
+.nuevo-photo-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.nuevo-photo-thumb--uploading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nuevo-photo-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-top-color: var(--color-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.nuevo-cargar-mas {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid #1b1b1b;
+  padding: 7px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: #1b1b1b;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+.nuevo-cargar-mas:hover { opacity: 0.7; }
+
+.nuevo-file-input { display: none; }

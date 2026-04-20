@@ -51,7 +51,14 @@ export default function EditorPage() {
   const [previewSnapshot, setPreviewSnapshot] = useState<Record<number, SpreadSnapshot>>({})
 
   // ── Photos ─────────────────────────────────────────────────────────────────
-  const [photos,       setPhotos]       = useState<Photo[]>([])
+  const [photos,       setPhotos]       = useState<Photo[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const stored = sessionStorage.getItem('zeika_photos')
+      if (stored) { sessionStorage.removeItem('zeika_photos'); return JSON.parse(stored) as Photo[] }
+    } catch {}
+    return []
+  })
   const [usedPhotoIds, setUsedPhotoIds] = useState<Set<string>>(new Set())
   const photosRef = useRef<Photo[]>([])
 
