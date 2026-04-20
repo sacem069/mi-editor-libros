@@ -9,7 +9,8 @@ import * as fabric from 'fabric'
 import Topbar      from '../components/Topbar/Topbar'
 import Toolbar     from '../components/Toolbar/Toolbar'
 import TextModal, { type TextOpts } from '../components/TextModal/TextModal'
-import PhotoPanel, { type Photo } from '../components/PhotoPanel/PhotoPanel'
+const PhotoPanel = dynamic(() => import('../components/PhotoPanel/PhotoPanel'), { ssr: false })
+import type { Photo } from '../components/PhotoPanel/PhotoPanel'
 import SpreadsView from '../components/SpreadsView/SpreadsView'
 // Canvas uses Fabric.js (browser-only). Dynamic import with ssr:false prevents
 // Next.js from attempting to server-render it, eliminating all hydration errors.
@@ -577,15 +578,31 @@ export default function EditorPage() {
 
       const matching = LAYOUTS.filter((l) => l.photoCount === count)
       if (matching.length === 0) continue
-      const layout = count === 2
-        ? (LAYOUTS.find((l) => l.id === 'layout_2_3') ?? matching[0])
-        : matching[Math.floor(Math.random() * matching.length)]
+      const layout = count === 1
+        ? (LAYOUTS.find((l) => l.id === 'layout_1_3') ?? matching[0])
+        : count === 2
+        ? (LAYOUTS.find((l) => l.id === 'layout_2_4') ?? matching[0])
+        : count === 3
+          ? (LAYOUTS.find((l) => l.id === 'layout_3_1') ?? matching[0])
+          : count === 4
+          ? (LAYOUTS.find((l) => l.id === 'layout_4_1') ?? matching[0])
+          : matching[Math.floor(Math.random() * matching.length)]
 
-      const assignments: PhotoAssignment[] = layout.frames.map(() => {
+      // Collect the batch for this page
+      const batch: PhotoAssignment[] = []
+      for (let fi = 0; fi < layout.frames.length && photoIdx < total; fi++, photoIdx++) {
         const p = allPhotos[photoIdx]
-        if (!p) return null as unknown as PhotoAssignment
-        photoIdx++
-        return { src: p.src, naturalW: p.width, naturalH: p.height }
+        batch.push({ src: p.src, naturalW: p.width, naturalH: p.height })
+      }
+
+      // Reorder batch to match frame orientations (landscape ↔ landscape, portrait ↔ portrait)
+      const lPool = batch.filter((a) => a.naturalW >= a.naturalH)
+      const pPool = batch.filter((a) => a.naturalW  < a.naturalH)
+      const assignments: PhotoAssignment[] = layout.frames.map((f) => {
+        const frameIsLandscape = (f.w * PAGE_W) >= (f.h * PAGE_H)
+        if (frameIsLandscape && lPool.length > 0)  return lPool.shift()!
+        if (!frameIsLandscape && pPool.length > 0) return pPool.shift()!
+        return (lPool.shift() ?? pPool.shift())!
       }).filter(Boolean) as PhotoAssignment[]
 
       const pageData  = buildPageFromLayout(layout, assignments, PAGE_W, PAGE_H)
