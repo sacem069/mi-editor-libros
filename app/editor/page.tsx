@@ -22,8 +22,8 @@ import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 import { BOOK_SIZE }                                      from '../config/bookSize'
 import { applyLayout, addTextBox, serializePage,
          deserializePage, dropPhotoOnFrame,
-         exportPageAsJpg }                                from '../components/Canvas/fabricHelpers'
-import type { PageData }                                   from '../components/Canvas/fabricHelpers'
+         exportPageAsJpg, buildPageFromLayout }            from '../components/Canvas/fabricHelpers'
+import type { PageData, PhotoAssignment }                  from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
 import { LanguageProvider } from '../context/LanguageContext'
@@ -541,6 +541,67 @@ export default function EditorPage() {
     saveCurrentSpread()
   }, [handleSpreadSelect, saveCurrentSpread])
 
+  // ── Auto-crear ────────────────────────────────────────────────────────────
+  const handleAutoCreate = useCallback(async () => {
+    const allPhotos = photosRef.current
+    if (allPhotos.length === 0) return
+
+    // Editable pages: spread-1 right, then spreads 2…totalContentSpreads+1 both sides
+    const available: Array<{ spreadIndex: number; side: 'left' | 'right' }> = []
+
+    const s1rFilled = spreadsData.current[1]?.right?.frames.some((f) => !f.isEmpty) ?? false
+    if (!s1rFilled) available.push({ spreadIndex: 1, side: 'right' })
+
+    for (let si = 2; si <= totalContentSpreads + 1; si++) {
+      const saved = spreadsData.current[si]
+      if (!(saved?.left?.frames.some((f)  => !f.isEmpty) ?? false)) available.push({ spreadIndex: si, side: 'left'  })
+      if (!(saved?.right?.frames.some((f) => !f.isEmpty) ?? false)) available.push({ spreadIndex: si, side: 'right' })
+    }
+
+    if (available.length === 0) return
+
+    const total = allPhotos.length
+    const pages = available.length
+    const base  = Math.floor(total / pages)
+    const extra = total % pages
+
+    const blankPage = (): PageData => ({ background: '#FFFFFF', pageW: PAGE_W, pageH: PAGE_H, frames: [], texts: [] })
+
+    let photoIdx = 0
+
+    for (let i = 0; i < available.length; i++) {
+      if (photoIdx >= total) break
+
+      const count = Math.min(5, Math.max(1, i < extra ? base + 1 : base))
+      const { spreadIndex, side } = available[i]
+
+      const matching = LAYOUTS.filter((l) => l.photoCount === count)
+      if (matching.length === 0) continue
+      const layout = count === 2
+        ? (LAYOUTS.find((l) => l.id === 'layout_2_3') ?? matching[0])
+        : matching[Math.floor(Math.random() * matching.length)]
+
+      const assignments: PhotoAssignment[] = layout.frames.map(() => {
+        const p = allPhotos[photoIdx]
+        if (!p) return null as unknown as PhotoAssignment
+        photoIdx++
+        return { src: p.src, naturalW: p.width, naturalH: p.height }
+      }).filter(Boolean) as PhotoAssignment[]
+
+      const pageData  = buildPageFromLayout(layout, assignments, PAGE_W, PAGE_H)
+      const otherSide = side === 'left' ? 'right' : 'left'
+      const existing  = spreadsData.current[spreadIndex]
+
+      spreadsData.current[spreadIndex] = {
+        [side]:      pageData,
+        [otherSide]: existing?.[otherSide] ?? blankPage(),
+      } as SpreadSnapshot
+    }
+
+    recomputeUsedPhotos()
+    await handleSpreadSelect(1)
+  }, [totalContentSpreads, recomputeUsedPhotos, handleSpreadSelect])
+
   // ── Zoom ───────────────────────────────────────────────────────────────────
   const handleZoomChange = useCallback((z: number) => setZoom(z), [])
 
@@ -716,6 +777,7 @@ export default function EditorPage() {
               onUpload={handlePhotoUpload}
               onPhotoClick={handlePhotoClick}
               onDelete={handlePhotoDelete}
+              onAutoCreate={handleAutoCreate}
             />
 
             <div className="editor-center">

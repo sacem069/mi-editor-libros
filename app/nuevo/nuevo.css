@@ -216,7 +216,7 @@
 
 .nuevo-details-layout {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 440px;
   gap: 0;
   align-items: start;
 }
@@ -226,9 +226,9 @@
   flex-direction: column;
   gap: 28px;
   max-width: 420px;
-  margin-left: 120px;
+  margin-left: 140px;
   margin-right: 80px;
-  margin-top: 60px;
+  margin-top: 70px;
 }
 
 .nuevo-field {
@@ -281,9 +281,9 @@
 /* Preview column: pushed to the right edge, pulled up to align with title */
 .nuevo-preview-wrap {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-top: -62px;
-  width: 380px;
+  width: 440px;
 }
 
 /* Preview card: same structure as Step 1, scaled up */

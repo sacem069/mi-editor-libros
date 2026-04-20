@@ -47,12 +47,74 @@
   text-align: center;
 }
 
-.photo-action-btn:hover {
-  background: var(--color-cream);
+.photo-action-btn svg,
+.photo-toggle-wrap svg {
+  transition: color 0.12s;
+}
+
+.photo-action-btn:hover svg,
+.photo-toggle-wrap:hover svg {
+  color: var(--color-blue);
 }
 
 .photo-action-btn--active {
   background: var(--color-cream);
+}
+
+/* ─── No usadas toggle ───────────────────────────────────────────────────────── */
+
+.photo-toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px 6px;
+  border-radius: 2px;
+  min-width: 64px;
+}
+
+.photo-toggle-pill {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: #d0d0d0;
+  border: 1px solid #b8b8b8;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.photo-toggle-pill--on {
+  background: #282828;
+  border-color: #282828;
+}
+
+.photo-toggle-pill::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.photo-toggle-pill--on::after {
+  transform: translateX(14px);
+}
+
+.photo-toggle-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: #282828;
+  white-space: nowrap;
+  text-align: center;
 }
 
 /* ─── Filter wrap + panel ────────────────────────────────────────────────────── */
@@ -129,7 +191,8 @@
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  padding: 10px 16px 0;
+  padding: 10px 16px;
+  border-top: 1px solid #CFCFCF;
 }
 
 .photo-autocreate-btn {
@@ -143,10 +206,16 @@
   padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
+  padding: 6px 28px;
 }
 
-.photo-autocreate-btn:hover {
+.photo-autocreate-btn:hover:not(:disabled) {
   background: var(--color-cream);
+}
+
+.photo-autocreate-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ─── Contador ───────────────────────────────────────────────────────────────── */

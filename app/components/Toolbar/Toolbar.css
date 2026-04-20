@@ -55,8 +55,8 @@
   opacity: 1;
 }
 
-.toolbar-btn:hover:not(:disabled) {
-  background: var(--color-cream);
+.toolbar-btn:hover:not(:disabled) svg {
+  color: var(--color-blue);
 }
 
 .toolbar-btn:disabled {

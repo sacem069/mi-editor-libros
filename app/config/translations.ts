@@ -19,7 +19,7 @@ export const translations = {
     reviewAndBuy: 'Revisar y comprar',
     back:         'Contra',
     cover:        'Tapa',
-    orderFilter:  'Ordenar / Filtrar',
+    orderFilter:  'Ordenar',
   },
   en: {
     exportJpg:    'Export JPG',

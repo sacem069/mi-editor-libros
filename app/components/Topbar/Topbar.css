@@ -43,8 +43,8 @@
   color: #282828;
 }
 
-.topbar-action-btn:hover {
-  opacity: 0.7;
+.topbar-action-btn:hover svg {
+  color: var(--color-blue);
 }
 
 .topbar-btn-primary {

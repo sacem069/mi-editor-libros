@@ -14,15 +14,15 @@ export type Photo = {
 }
 
 interface PhotoPanelProps {
-  photos:       Photo[]
-  usedPhotoIds: Set<string>
-  onUpload:     (photos: Photo[]) => void
-  onPhotoClick: (photo: Photo) => void
-  onDelete:     (photoId: string) => void
+  photos:        Photo[]
+  usedPhotoIds:  Set<string>
+  onUpload:      (photos: Photo[]) => void
+  onPhotoClick:  (photo: Photo) => void
+  onDelete:      (photoId: string) => void
+  onAutoCreate?: () => Promise<void>
 }
 
-type SortBy     = 'fecha' | 'nombre'
-type ShowFilter = 'todas' | 'usadas' | 'sin-usar'
+type SortBy = 'fecha' | 'nombre'
 
 export default function PhotoPanel({
   photos,
@@ -30,6 +30,7 @@ export default function PhotoPanel({
   onUpload,
   onPhotoClick,
   onDelete,
+  onAutoCreate,
 }: PhotoPanelProps) {
   const { t } = useLang()
   const fileInputRef  = useRef<HTMLInputElement>(null)
@@ -37,8 +38,9 @@ export default function PhotoPanel({
 
   const [filterOpen,    setFilterOpen]    = useState(false)
   const [sortBy,        setSortBy]        = useState<SortBy>('fecha')
-  const [showFilter,    setShowFilter]    = useState<ShowFilter>('todas')
+  const [showUnused,    setShowUnused]    = useState(false)
   const [uploadingIds,  setUploadingIds]  = useState<Set<string>>(new Set())
+  const [autoCreating,  setAutoCreating]  = useState(false)
 
   // ── Close filter panel on outside click ──────────────────────────────────
 
@@ -140,11 +142,7 @@ export default function PhotoPanel({
   // ── Filtered + sorted photo list ──────────────────────────────────────────
 
   const visiblePhotos = photos
-    .filter((p) => {
-      if (showFilter === 'usadas')   return usedPhotoIds.has(p.id)
-      if (showFilter === 'sin-usar') return !usedPhotoIds.has(p.id)
-      return true
-    })
+    .filter((p) => !showUnused || !usedPhotoIds.has(p.id))
     .sort((a, b) =>
       sortBy === 'nombre' ? a.name.localeCompare(b.name) : 0,
     )
@@ -158,6 +156,16 @@ export default function PhotoPanel({
         <button className="photo-action-btn" onClick={openFilePicker}>
           <CirclePlus size={24} strokeWidth={1.5} />
           <span>{t.uploadPhoto}</span>
+        </button>
+
+        {/* No usadas toggle */}
+        <button
+          className="photo-toggle-wrap"
+          onClick={() => setShowUnused((v) => !v)}
+          aria-pressed={showUnused}
+        >
+          <div className={`photo-toggle-pill${showUnused ? ' photo-toggle-pill--on' : ''}`} />
+          <span className="photo-toggle-label">No usadas</span>
         </button>
 
         {/* Filter button + dropdown */}
@@ -187,26 +195,6 @@ export default function PhotoPanel({
                 Nombre
               </button>
 
-              <p className="photo-filter-heading photo-filter-heading--spaced">Mostrar/Ocultar</p>
-              <div className="photo-filter-underline" />
-              <button
-                className={`photo-filter-option${showFilter === 'todas' ? ' photo-filter-option--active' : ''}`}
-                onClick={() => setShowFilter('todas')}
-              >
-                Todas
-              </button>
-              <button
-                className={`photo-filter-option${showFilter === 'usadas' ? ' photo-filter-option--active' : ''}`}
-                onClick={() => setShowFilter('usadas')}
-              >
-                Usadas
-              </button>
-              <button
-                className={`photo-filter-option${showFilter === 'sin-usar' ? ' photo-filter-option--active' : ''}`}
-                onClick={() => setShowFilter('sin-usar')}
-              >
-                Sin Usar
-              </button>
             </div>
           )}
         </div>
@@ -269,6 +257,22 @@ export default function PhotoPanel({
           )
         })}
       </div>
+
+      {/* ── Auto-crear ── */}
+      {onAutoCreate && (
+        <div className="photo-panel-autocreate-row">
+          <button
+            className="photo-autocreate-btn"
+            disabled={autoCreating || photos.length === 0}
+            onClick={async () => {
+              setAutoCreating(true)
+              try { await onAutoCreate() } finally { setAutoCreating(false) }
+            }}
+          >
+            {autoCreating ? 'Generando...' : 'Auto-crear'}
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

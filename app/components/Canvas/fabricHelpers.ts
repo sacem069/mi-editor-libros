@@ -548,6 +548,54 @@ export function serializePage(
   }
 }
 
+// ─── 8. buildPageFromLayout ─────────────────────────────────────────────────
+// Builds a PageData snapshot without a live Fabric canvas — used by auto-crear.
+// Photos must have natural dimensions so cover-fit scale can be pre-computed.
+
+export type PhotoAssignment = {
+  src:      string
+  naturalW: number
+  naturalH: number
+}
+
+export function buildPageFromLayout(
+  layout:   Layout,
+  photos:   PhotoAssignment[],   // may be shorter than layout.frames (rest become empty)
+  pageW:    number,
+  pageH:    number,
+): PageData {
+  const frames = layout.frames.map((frame, i) => {
+    const frameX = frame.x * pageW
+    const frameY = frame.y * pageH
+    const frameW = frame.w * pageW
+    const frameH = frame.h * pageH
+
+    const photo = photos[i]
+    if (!photo) return { frameX, frameY, frameW, frameH, isEmpty: true as const }
+
+    const nW    = photo.naturalW || 1
+    const nH    = photo.naturalH || 1
+    const scale = Math.max(frameW / nW, frameH / nH)
+
+    return {
+      frameX,
+      frameY,
+      frameW,
+      frameH,
+      isEmpty: false as const,
+      photo:   photo.src,
+      scaleX:  scale,
+      scaleY:  scale,
+      imgLeft: frameX + frameW / 2,
+      imgTop:  frameY + frameH / 2,
+      naturalW: nW,
+      naturalH: nH,
+    }
+  })
+
+  return { background: '#FFFFFF', pageW, pageH, frames, texts: [] }
+}
+
 // ─── 7b. exportPageAsJpg ────────────────────────────────────────────────────
 
 export async function exportPageAsJpg(
