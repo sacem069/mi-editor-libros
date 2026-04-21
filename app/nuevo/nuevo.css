@@ -78,7 +78,12 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 20px 64px 32px 64px;
+  padding: 20px 64px 20px 64px;
+  position: sticky;
+  bottom: 0;
+  background: var(--color-white);
+  border-top: 1px solid #e8e8e8;
+  z-index: 10;
 }
 
 .nuevo-btn {
@@ -125,8 +130,8 @@
 }
 
 .nuevo-size-card {
-  background: #eeeeee;
-  border: 1.5px solid #191919;
+  background: #f8fafc;
+  border: 1.5px solid #aca5a5;
   cursor: pointer;
   padding: 0;
   text-align: left;
@@ -199,7 +204,7 @@
 
 .nuevo-size-card-divider {
   height: 2px;
-  background: #c8c8c8;
+  background: #b1c8e3;
   margin: 0 0 8px 0;
 }
 
@@ -224,23 +229,22 @@
 .nuevo-form {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  max-width: 420px;
-  margin-left: 140px;
+  gap: 60px;
+  max-width: 550px;
   margin-right: 80px;
-  margin-top: 70px;
+  margin-top: 130px;
 }
 
 .nuevo-field {
   display: grid;
   grid-template-columns: 130px 1fr;
   align-items: center;
-  gap: 16px;
+  gap: 50px;
 }
 
 .nuevo-label {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 400;
   color: #303030;
   letter-spacing: 0.27px;
@@ -249,16 +253,16 @@
 
 .nuevo-input,
 .nuevo-select {
-  height: 34px;
-  background: #f3f3f3;
-  border: 1px solid #191919;
+  height: 45px;
+  background: #f8fafc;
+  border: 1px solid #a1a1a1;
   padding: 0 10px;
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   color: #191919;
   width: 100%;
-  max-width: 300px;
+  max-width: 350px;
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23191919' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -288,8 +292,8 @@
 
 /* Preview card: same structure as Step 1, scaled up */
 .nuevo-preview-card {
-  background: #eeeeee;
-  border: 1.5px solid #191919;
+  background: #f8fafc;
+  border: 1.5px solid #8e8e8e;
   width: 380px;
   display: flex;
   flex-direction: column;
@@ -328,6 +332,81 @@
   letter-spacing: 0.36px;
 }
 
+/* ── Designer custom select ──────────────────────────────────────────────── */
+
+.nuevo-designer-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.nuevo-designer-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 110px;
+}
+
+.nuevo-designer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nuevo-designer-arrow {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.nuevo-designer-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 50;
+  min-width: 110px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.nuevo-designer-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+  transition: opacity 0.12s;
+}
+
+.nuevo-designer-option:hover {
+  opacity: 0.85;
+}
+
+.nuevo-designer-option--active {
+  font-weight: 600;
+}
+
 /* ── Step 3: photos ───────────────────────────────────────────────────────── */
 
 .nuevo-upload-empty {
@@ -342,7 +421,7 @@
 
 .nuevo-upload-empty-text {
   font-family: var(--font-body);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 400;
   color: #1b1b1b;
   letter-spacing: 0.44px;
@@ -402,6 +481,17 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.nuevo-step-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 48px;
+}
+
+.nuevo-step-title-row .nuevo-step-title {
+  margin-bottom: 0;
+}
+
 .nuevo-cargar-mas {
   display: inline-flex;
   align-items: center;
@@ -415,8 +505,6 @@
   color: #1b1b1b;
   cursor: pointer;
   transition: opacity 0.15s;
-  margin-top: 8px;
-  align-self: flex-start;
 }
 
 .nuevo-cargar-mas:hover { opacity: 0.7; }

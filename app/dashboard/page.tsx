@@ -5,8 +5,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import './dashboard.css'
 
-type Status = 'NUEVO' | 'EN PROCESO' | 'FINALIZADOS'
-type Designer = 'MAIKA' | 'VICKY' | 'JOSE'
+type Status = 'Nuevo' | 'En proceso' | 'Finalizados'
+type Designer = 'Maika' | 'Vicky' | 'Jose'
 type FilterTab = 'TODOS' | 'NUEVOS' | 'EN PROCESO' | 'FINALIZADOS'
 
 interface Order {
@@ -20,20 +20,20 @@ interface Order {
 }
 
 const MOCK_ORDERS: Order[] = [
-  { id: '1', pedido: 'ZK-2026-0142', cliente: 'YANINA BARRONDO', fecha: '03/04/26', tamano: 'VERTICAL',  disenadora: 'MAIKA', estado: 'NUEVO'        },
-  { id: '2', pedido: 'ZK-2026-0139', cliente: 'ROCIO FERREYRA',  fecha: '01/04/26', tamano: 'CUADRADO', disenadora: 'VICKY', estado: 'EN PROCESO'    },
-  { id: '3', pedido: 'ZK-2026-0135', cliente: 'LUCAS PEREYRA',   fecha: '28/03/26', tamano: 'MEDIANO',  disenadora: 'JOSE',  estado: 'FINALIZADOS'   },
-  { id: '4', pedido: 'ZK-2026-0131', cliente: 'SOFIA ROMERO',    fecha: '25/03/26', tamano: 'VERTICAL', disenadora: 'MAIKA', estado: 'EN PROCESO'    },
-  { id: '5', pedido: 'ZK-2026-0128', cliente: 'MARTIN GOMEZ',    fecha: '22/03/26', tamano: 'CUADRADO', disenadora: 'JOSE',  estado: 'NUEVO'         },
+  { id: '1', pedido: 'ZK-2026-0142', cliente: 'Yanina Barrondo', fecha: '03/04/26', tamano: 'Vertical',  disenadora: 'Maika', estado: 'Nuevo'       },
+  { id: '2', pedido: 'ZK-2026-0139', cliente: 'Rocio Ferreyra',  fecha: '01/04/26', tamano: 'Cuadrado', disenadora: 'Vicky', estado: 'En proceso'  },
+  { id: '3', pedido: 'ZK-2026-0135', cliente: 'Lucas Pereyra',   fecha: '28/03/26', tamano: 'Mediano',  disenadora: 'Jose',  estado: 'Finalizados' },
+  { id: '4', pedido: 'ZK-2026-0131', cliente: 'Sofia Romero',    fecha: '25/03/26', tamano: 'Vertical', disenadora: 'Maika', estado: 'En proceso'  },
+  { id: '5', pedido: 'ZK-2026-0128', cliente: 'Martin Gomez',    fecha: '22/03/26', tamano: 'Cuadrado', disenadora: 'Jose',  estado: 'Nuevo'       },
 ]
 
 const TABS: FilterTab[] = ['TODOS', 'NUEVOS', 'EN PROCESO', 'FINALIZADOS']
 
 const TAB_STATUS_MAP: Record<string, Status | null> = {
   TODOS:        null,
-  NUEVOS:       'NUEVO',
-  'EN PROCESO': 'EN PROCESO',
-  FINALIZADOS:  'FINALIZADOS',
+  NUEVOS:       'Nuevo',
+  'EN PROCESO': 'En proceso',
+  FINALIZADOS:  'Finalizados',
 }
 
 export default function DashboardPage() {
@@ -122,7 +122,7 @@ export default function DashboardPage() {
                     </span>
                   </td>
                   <td>
-                    <span className={`dash-badge dash-badge--${order.estado === 'EN PROCESO' ? 'en-proceso' : order.estado.toLowerCase()}`}>
+                    <span className={`dash-badge dash-badge--${order.estado === 'En proceso' ? 'en-proceso' : order.estado.toLowerCase()}`}>
                       {order.estado}
                     </span>
                   </td>

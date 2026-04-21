@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -118,6 +118,60 @@ function Step1({ selected, onSelect }: { selected: string | null; onSelect: (id:
   )
 }
 
+// ── Designer dropdown ────────────────────────────────────────────────────────
+
+const DESIGNER_COLORS: Record<string, { bg: string; border: string; color: string; dot: string }> = {
+  Maika: { bg: '#d4f0ed', border: '#109e90', color: '#006057', dot: '#109e90' },
+  Vicky: { bg: '#f0d6fa', border: '#a719d3', color: '#6b0099', dot: '#a719d3' },
+  Jose:  { bg: '#fde8db', border: '#f97944', color: '#7a2d0e', dot: '#f97944' },
+}
+
+function DesignerSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const c = DESIGNER_COLORS[value]
+
+  return (
+    <div className="nuevo-designer-wrap" ref={ref}>
+      <button
+        type="button"
+        className="nuevo-designer-trigger"
+        style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.color }}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="nuevo-designer-dot" style={{ background: c.dot }} />
+        {value}
+        <span className="nuevo-designer-arrow">▾</span>
+      </button>
+      {open && (
+        <div className="nuevo-designer-menu">
+          {Object.entries(DESIGNER_COLORS).map(([name, s]) => (
+            <button
+              key={name}
+              type="button"
+              className={`nuevo-designer-option${value === name ? ' nuevo-designer-option--active' : ''}`}
+              style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
+              onClick={() => { onChange(name); setOpen(false) }}
+            >
+              <span className="nuevo-designer-dot" style={{ background: s.dot }} />
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Step 2 ────────────────────────────────────────────────────────────────────
 
 interface Step2Props {
@@ -145,25 +199,7 @@ function Step2({ selectedBook, details, onChange }: Step2Props) {
           </div>
           <div className="nuevo-field">
             <label className="nuevo-label">DISEÑADORA</label>
-            <select className="nuevo-select" value={details.disenadora} onChange={(e) => onChange('disenadora', e.target.value)}>
-              <option value="Maika">Maika</option>
-              <option value="Vicky">Vicky</option>
-              <option value="Jose">Jose</option>
-            </select>
-          </div>
-          <div className="nuevo-field">
-            <label className="nuevo-label">TAPA</label>
-            <select className="nuevo-select" value={details.tapa} onChange={(e) => onChange('tapa', e.target.value)}>
-              <option value="Tapa Dura">Tapa Dura</option>
-              <option value="Tapa Blanda">Tapa Blanda</option>
-            </select>
-          </div>
-          <div className="nuevo-field">
-            <label className="nuevo-label">ACABADO DE TAPA</label>
-            <select className="nuevo-select" value={details.acabado} onChange={(e) => onChange('acabado', e.target.value)}>
-              <option value="Laminado Mate">Laminado Mate</option>
-              <option value="Laminado Brillo">Laminado Brillo</option>
-            </select>
+            <DesignerSelect value={details.disenadora} onChange={(v) => onChange('disenadora', v)} />
           </div>
         </div>
 
@@ -215,41 +251,44 @@ function Step3({ photos, uploading, onUpload }: Step3Props) {
 
   return (
     <div className="nuevo-body nuevo-body--photos">
-      <h1 className="nuevo-step-title">3. CARGÁ TUS FOTOS</h1>
+      <div className="nuevo-step-title-row">
+        <h1 className="nuevo-step-title">3. CARGÁ TUS FOTOS</h1>
+        {photos.length > 0 && (
+          <button className="nuevo-cargar-mas" onClick={() => moreRef.current?.click()}>
+            <Monitor size={18} strokeWidth={1.5} />
+            Cargar más
+          </button>
+        )}
+      </div>
 
       {photos.length === 0 && !uploading ? (
         <div className="nuevo-upload-empty">
           <Monitor size={52} strokeWidth={1} color="#aaa" />
-          <p className="nuevo-upload-empty-text">SUBIR FOTOS DESDE COMPUTADORA</p>
+          <p className="nuevo-upload-empty-text">Subir fotos desde la computadora</p>
           <button className="nuevo-upload-btn" onClick={() => inputRef.current?.click()}>
             SUBIR FOTOS
           </button>
         </div>
       ) : (
-        <div className="nuevo-photo-grid">
-          {uploading && (
-            <div className="nuevo-photo-thumb nuevo-photo-thumb--uploading">
-              <div className="nuevo-photo-spinner" />
-            </div>
-          )}
-          {photos.map((p) => (
-            <div key={p.id} className="nuevo-photo-thumb">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.src} alt={p.name} className="nuevo-photo-thumb-img" />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="nuevo-photo-grid">
+            {uploading && (
+              <div className="nuevo-photo-thumb nuevo-photo-thumb--uploading">
+                <div className="nuevo-photo-spinner" />
+              </div>
+            )}
+            {photos.map((p) => (
+              <div key={p.id} className="nuevo-photo-thumb">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.src} alt={p.name} className="nuevo-photo-thumb-img" />
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <input ref={inputRef} type="file" accept={ACCEPTED} multiple className="nuevo-file-input" onChange={handleChange} />
       <input ref={moreRef}  type="file" accept={ACCEPTED} multiple className="nuevo-file-input" onChange={handleChange} />
-
-      {photos.length > 0 && (
-        <button className="nuevo-cargar-mas" onClick={() => moreRef.current?.click()}>
-          <Monitor size={18} strokeWidth={1.5} />
-          Cargar más
-        </button>
-      )}
     </div>
   )
 }
