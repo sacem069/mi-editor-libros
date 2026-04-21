@@ -234,12 +234,13 @@ function Step2({ selectedBook, details, onChange }: Step2Props) {
 // ── Step 3 ────────────────────────────────────────────────────────────────────
 
 interface Step3Props {
-  photos:       Photo[]
-  uploading:    boolean
-  onUpload:     (files: FileList) => void
+  photos:         Photo[]
+  uploadingCount: number
+  onUpload:       (files: FileList) => void
+  onDelete:       (id: string) => void
 }
 
-function Step3({ photos, uploading, onUpload }: Step3Props) {
+function Step3({ photos, uploadingCount, onUpload, onDelete }: Step3Props) {
   const inputRef    = useRef<HTMLInputElement>(null)
   const moreRef     = useRef<HTMLInputElement>(null)
   const ACCEPTED    = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif'
@@ -261,7 +262,7 @@ function Step3({ photos, uploading, onUpload }: Step3Props) {
         )}
       </div>
 
-      {photos.length === 0 && !uploading ? (
+      {photos.length === 0 && uploadingCount === 0 ? (
         <div className="nuevo-upload-empty">
           <Monitor size={52} strokeWidth={1} color="#aaa" />
           <p className="nuevo-upload-empty-text">Subir fotos desde la computadora</p>
@@ -271,18 +272,19 @@ function Step3({ photos, uploading, onUpload }: Step3Props) {
         </div>
       ) : (
         <>
-          <div className="nuevo-photo-grid">
-            {uploading && (
-              <div className="nuevo-photo-thumb nuevo-photo-thumb--uploading">
-                <div className="nuevo-photo-spinner" />
-              </div>
-            )}
-            {photos.map((p) => (
-              <div key={p.id} className="nuevo-photo-thumb">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.src} alt={p.name} className="nuevo-photo-thumb-img" />
-              </div>
-            ))}
+          <div className="nuevo-photo-area">
+            <div className="nuevo-photo-grid">
+              {Array.from({ length: uploadingCount }).map((_, i) => (
+                <div key={`skeleton-${i}`} className="nuevo-photo-skeleton" />
+              ))}
+              {photos.map((p) => (
+                <div key={p.id} className="nuevo-photo-thumb">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.src} alt={p.name} className="nuevo-photo-thumb-img" />
+                  <button className="nuevo-photo-delete" onClick={() => onDelete(p.id)} aria-label="Eliminar">✕</button>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -305,8 +307,8 @@ export default function NuevoPage() {
     tapa:       'Tapa Dura',
     acabado:    'Laminado Mate',
   })
-  const [photos,    setPhotos]    = useState<Photo[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [photos,         setPhotos]         = useState<Photo[]>([])
+  const [uploadingCount, setUploadingCount] = useState(0)
 
   const selectedBook = BOOK_SIZES.find((b) => b.id === selectedSize) ?? null
 
@@ -314,15 +316,21 @@ export default function NuevoPage() {
 
   const handleUpload = useCallback(async (files: FileList) => {
     const arr = Array.from(files)
-    setUploading(true)
-    const results = await Promise.allSettled(arr.map(uploadFile))
+    setUploadingCount(arr.length)
+    const results = await Promise.allSettled(arr.map(async (file, i) => {
+      const photo = await uploadFile(file)
+      setUploadingCount((c) => Math.max(0, c - 1))
+      return photo
+    }))
     const uploaded: Photo[] = []
     for (const r of results) {
       if (r.status === 'fulfilled') uploaded.push(r.value)
     }
     setPhotos((prev) => [...prev, ...uploaded])
-    setUploading(false)
+    setUploadingCount(0)
   }, [])
+
+  const handleDeletePhoto = (id: string) => setPhotos((prev) => prev.filter((p) => p.id !== id))
 
   const handleNext = () => {
     if (step < 3) {
@@ -340,7 +348,7 @@ export default function NuevoPage() {
 
   const nextDisabled =
     (step === 1 && !selectedSize) ||
-    (step === 3 && photos.length === 0 && !uploading)
+    (step === 3 && photos.length === 0 && uploadingCount === 0)
 
   const nextLabel = step === 3 ? 'ABRIR EDITOR' : 'SIGUIENTE'
 
@@ -355,7 +363,7 @@ export default function NuevoPage() {
         <Step2 selectedBook={selectedBook} details={details} onChange={handleDetailChange} />
       )}
       {step === 3 && (
-        <Step3 photos={photos} uploading={uploading} onUpload={handleUpload} />
+        <Step3 photos={photos} uploadingCount={uploadingCount} onUpload={handleUpload} onDelete={handleDeletePhoto} />
       )}
 
       <NuevoFooter

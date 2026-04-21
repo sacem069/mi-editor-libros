@@ -1,6 +1,6 @@
 'use client'
 
-import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler } from 'lucide-react'
+import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler, Hand } from 'lucide-react'
 import { useLang } from '../../context/LanguageContext'
 import './Toolbar.css'
 
@@ -8,20 +8,24 @@ interface ToolbarProps {
   canUndo: boolean
   canRedo: boolean
   showBleed: boolean
+  panMode: boolean
   onUndo: () => void
   onRedo: () => void
   onToggleBleed: () => void
   onAddText: () => void
+  onPanModeToggle: () => void
 }
 
 export default function Toolbar({
   canUndo,
   canRedo,
   showBleed,
+  panMode,
   onUndo,
   onRedo,
   onToggleBleed,
   onAddText,
+  onPanModeToggle,
 }: ToolbarProps) {
   const { t } = useLang()
   return (
@@ -79,6 +83,15 @@ export default function Toolbar({
         >
           <Ruler size={22} strokeWidth={1.5} />
           <span className="toolbar-tooltip">{t.guides}</span>
+        </button>
+
+        <button
+          className={`toolbar-btn${panMode ? ' toolbar-btn--active' : ''}`}
+          onClick={onPanModeToggle}
+          aria-label="Mano"
+        >
+          <Hand size={22} strokeWidth={1.5} />
+          <span className="toolbar-tooltip">Mano</span>
         </button>
       </div>
     </div>

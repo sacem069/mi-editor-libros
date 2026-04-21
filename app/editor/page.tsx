@@ -75,6 +75,7 @@ export default function EditorPage() {
   // ── Canvas settings ────────────────────────────────────────────────────────
   const [zoom,      setZoom]      = useState(0.75) // overridden by Canvas on mount
   const [showBleed, setShowBleed] = useState(false)
+  const [panMode,   setPanMode]   = useState(false)
 
   // ── History (undo / redo) ──────────────────────────────────────────────────
   const [canUndo, setCanUndo] = useState(false)
@@ -628,6 +629,9 @@ export default function EditorPage() {
   // ── Bleed ──────────────────────────────────────────────────────────────────
   const handleToggleBleed = useCallback(() => setShowBleed((v) => !v), [])
 
+  // ── Viewport pan mode ─────────────────────────────────────────────────────
+  const handlePanModeToggle = useCallback(() => setPanMode((v) => !v), [])
+
   // ── Object selected (future: show properties) ─────────────────────────────
   const handleObjectSelected = useCallback((_obj: fabric.FabricObject | null) => {
     // futuro: mostrar propiedades en toolbar
@@ -805,10 +809,12 @@ export default function EditorPage() {
                 canUndo={canUndo}
                 canRedo={canRedo}
                 showBleed={showBleed}
+                panMode={panMode}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onToggleBleed={handleToggleBleed}
                 onAddText={handleAddText}
+                onPanModeToggle={handlePanModeToggle}
               />
 
               <Canvas
@@ -817,6 +823,7 @@ export default function EditorPage() {
                 currentSpread={currentSpread}
                 totalSpreads={totalSpreads}
                 viewMode={viewMode}
+                panMode={panMode}
                 onObjectSelected={handleObjectSelected}
                 onCanvasReady={handleCanvasReady}
                 onSpreadChange={handleSpreadSelect}

@@ -45,7 +45,6 @@
 .page-strip-spread {
   display: flex;
   flex-direction: row;
-  gap: 2px;
   flex-shrink: 0;
   cursor: pointer;
   padding: 3px;

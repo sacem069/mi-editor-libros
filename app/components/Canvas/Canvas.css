@@ -4,7 +4,7 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #efefef;
+  background: #f7f7f7;
 }
 
 /* ─── Inner scroll area — centers the spread ────────────────────────────────── */
@@ -253,7 +253,7 @@
   top: 12px;
   right: 16px;
   display: flex;
-  z-index: 20;
+  z-index: 40;
 }
 
 .canvas-view-btn {
@@ -285,6 +285,15 @@
   color: #191919;
 }
 
+/* ─── Viewport pan overlay ───────────────────────────────────────────────────── */
+
+.canvas-vp-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  cursor: grab;
+}
+
 /* ─── Zoom badge ─────────────────────────────────────────────────────────────── */
 
 .canvas-zoom-badge {
@@ -296,9 +305,29 @@
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 500;
-  padding: 3px 8px;
   border-radius: 3px;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
   user-select: none;
   letter-spacing: 0.3px;
+  z-index: 40;
+}
+
+.canvas-zoom-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.85;
+  transition: opacity 0.12s;
+}
+
+.canvas-zoom-btn:hover {
+  opacity: 1;
 }

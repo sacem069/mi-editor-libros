@@ -20,8 +20,8 @@ const SPINE    = 1
 const SPREAD_W = PAGE_W + SPINE + PAGE_W   // 1633
 const SPREAD_H = PAGE_NUM + PAGE_H + NAV   // 1162
 
-const ZOOM_MIN = 0.25
-const ZOOM_MAX = 2.0
+const ZOOM_MIN = 0.1
+const ZOOM_MAX = 5.0
 
 const MAX_HISTORY = 20
 
@@ -31,6 +31,7 @@ interface CanvasProps {
   currentSpread: number
   totalSpreads: number
   viewMode: 'editor' | 'spreads'
+  panMode: boolean
   onObjectSelected: (obj: fabric.FabricObject | null) => void
   onCanvasReady: (left: fabric.Canvas, right: fabric.Canvas) => void
   onSpreadChange: (spread: number) => void
@@ -82,6 +83,7 @@ export default function Canvas({
   currentSpread,
   totalSpreads,
   viewMode,
+  panMode,
   onObjectSelected,
   onCanvasReady,
   onSpreadChange,
@@ -96,7 +98,19 @@ export default function Canvas({
   const rightElRef  = useRef<HTMLCanvasElement>(null)
   const leftFabric  = useRef<fabric.Canvas | null>(null)
   const rightFabric = useRef<fabric.Canvas | null>(null)
-  const outerRef    = useRef<HTMLDivElement>(null)
+  const outerRef        = useRef<HTMLDivElement>(null)
+  const innerRef        = useRef<HTMLDivElement>(null)
+  const spreadRootRef   = useRef<HTMLDivElement>(null)
+  const scaleAnchorRef  = useRef<HTMLDivElement>(null)
+  const badgeTextRef    = useRef<HTMLSpanElement>(null)
+  const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Viewport pan state ───────────────────────────────────────────────────
+  const [spacebarPan,   setSpacebarPan]   = useState(false)
+  const isVPDragging    = useRef(false)
+  const vpDragStart     = useRef({ x: 0, y: 0, sl: 0, st: 0 })
+  const vpOverlayRef    = useRef<HTMLDivElement>(null)
+  const isTextEditingRef = useRef(false)
 
   const { t } = useLang()
 
@@ -143,36 +157,128 @@ export default function Canvas({
   useEffect(() => { onLayoutDropOnPageRef.current  = onLayoutDropOnPage  }, [onLayoutDropOnPage])
   useEffect(() => { onPhotoDropRef.current         = onPhotoDrop         }, [onPhotoDrop])
   useEffect(() => { onTextEditRef.current          = onTextEdit          }, [onTextEdit])
-  useEffect(() => { zoomRef.current                = zoom               }, [zoom])
+  useEffect(() => { zoomRef.current = zoom }, [zoom])
+  useEffect(() => { isTextEditingRef.current = textEditing }, [textEditing])
+
+  // ── Spacebar → temporary viewport pan ────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return
+      if (isTextEditingRef.current) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      e.preventDefault()
+      setSpacebarPan(true)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      setSpacebarPan(false)
+      isVPDragging.current = false
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup',   onKeyUp)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup',   onKeyUp)
+    }
+  }, [])
+
+  // ── Viewport drag: move scroll while overlay is up ────────────────────────
+  const isViewportPanning = panMode || spacebarPan
+  useEffect(() => {
+    if (!isViewportPanning) {
+      isVPDragging.current = false
+      return
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isVPDragging.current) return
+      const inner = innerRef.current
+      if (!inner) return
+      const { x, y, sl, st } = vpDragStart.current
+      inner.scrollLeft = sl - (e.clientX - x)
+      inner.scrollTop  = st - (e.clientY - y)
+    }
+    const onMouseUp = () => {
+      isVPDragging.current = false
+      if (vpOverlayRef.current) vpOverlayRef.current.style.cursor = 'grab'
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup',   onMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup',   onMouseUp)
+    }
+  }, [isViewportPanning])
+
+  // ── applyZoom: bypasses React state for smooth gesture zoom ──────────────
+  const applyZoom = useCallback((newZoom: number, scrollTo?: { x: number; y: number }) => {
+    const root   = spreadRootRef.current
+    const anchor = scaleAnchorRef.current
+    const inner  = innerRef.current
+    if (!root || !anchor || !inner) return
+
+    root.style.transform  = `scale(${newZoom})`
+    anchor.style.width    = `${SPREAD_W * newZoom}px`
+    anchor.style.height   = `${SPREAD_H * newZoom}px`
+    if (badgeTextRef.current) badgeTextRef.current.textContent = `${Math.round(newZoom * 100)}%`
+
+    if (scrollTo) {
+      inner.scrollLeft = Math.max(0, scrollTo.x)
+      inner.scrollTop  = Math.max(0, scrollTo.y)
+    }
+
+    zoomRef.current = newZoom
+
+    if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+    zoomDebounceRef.current = setTimeout(() => {
+      onZoomChangeRef.current(newZoom)
+    }, 150)
+  }, [])
 
   // ── Initial zoom: hardcoded 49% ──────────────────────────────────────────
   useEffect(() => {
     onZoomChangeRef.current(0.49)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Mouse wheel / pinch zoom ──────────────────────────────────────────────
+  // ── Mouse wheel / pinch zoom — direct DOM, no React state ────────────────
   useEffect(() => {
     const el = outerRef.current
     if (!el) return
 
     const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
       e.preventDefault()
 
-      let dy = e.deltaY
-      if (e.deltaMode === 1) dy *= 16   // LINE mode → px
-      if (e.deltaMode === 2) dy *= 100  // PAGE mode → px
+      const inner = innerRef.current
+      if (!inner) return
 
-      const sensitivity = e.ctrlKey ? 0.02 : 0.003
-      const factor      = 1 - dy * sensitivity
-      const next        = parseFloat(
-        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomRef.current * factor)).toFixed(3)
+      const rect    = inner.getBoundingClientRect()
+      const cursorX = e.clientX - rect.left
+      const cursorY = e.clientY - rect.top
+      const contentX = (cursorX + inner.scrollLeft) / zoomRef.current
+      const contentY = (cursorY + inner.scrollTop)  / zoomRef.current
+
+      let dy = e.deltaY
+      if (e.deltaMode === 1) dy *= 16
+      if (e.deltaMode === 2) dy *= 100
+      const newZoom = parseFloat(
+        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomRef.current * (1 - dy * 0.006))).toFixed(4)
       )
-      onZoomChangeRef.current(next)
+
+      if (newZoom === zoomRef.current) return
+
+      applyZoom(newZoom, {
+        x: contentX * newZoom - cursorX,
+        y: contentY * newZoom - cursorY,
+      })
     }
 
     el.addEventListener('wheel', handleWheel, { passive: false })
-    return () => el.removeEventListener('wheel', handleWheel)
-  }, [])
+    return () => {
+      el.removeEventListener('wheel', handleWheel)
+      if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+    }
+  }, [applyZoom])
 
   // ── Fabric initialisation ─────────────────────────────────────────────────
   useEffect(() => {
@@ -774,10 +880,11 @@ export default function Canvas({
   return (
     <div className="canvas-outer" ref={outerRef}>
       {/* ── Scrollable + centered area ── */}
-      <div className="canvas-inner">
-        <div className="canvas-scale-anchor" style={{ width: scaledW, height: scaledH }}>
+      <div className="canvas-inner" ref={innerRef}>
+        <div className="canvas-scale-anchor" ref={scaleAnchorRef} style={{ width: scaledW, height: scaledH }}>
           <div
             className="canvas-spread-root"
+            ref={spreadRootRef}
             style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
           >
             {/* Pages row */}
@@ -888,6 +995,20 @@ export default function Canvas({
         </div>
       </div>
 
+      {/* ── Viewport pan overlay — intercepts all pointer events during pan mode ── */}
+      {isViewportPanning && (
+        <div
+          ref={vpOverlayRef}
+          className="canvas-vp-overlay"
+          onMouseDown={(e) => {
+            isVPDragging.current = true
+            if (vpOverlayRef.current) vpOverlayRef.current.style.cursor = 'grabbing'
+            const inner = innerRef.current
+            if (inner) vpDragStart.current = { x: e.clientX, y: e.clientY, sl: inner.scrollLeft, st: inner.scrollTop }
+          }}
+        />
+      )}
+
       {/* ── View toggle ── */}
       <div className="canvas-view-toggle">
         <button
@@ -913,9 +1034,43 @@ export default function Canvas({
         </button>
       </div>
 
-      {/* ── Zoom badge ── */}
-      <div className="canvas-zoom-badge" aria-label={`Zoom ${Math.round(zoom * 100)}%`}>
-        {Math.round(zoom * 100)}%
+      {/* ── Zoom controls ── */}
+      <div className="canvas-zoom-badge">
+        <button
+          className="canvas-zoom-btn"
+          onClick={() => {
+            const inner   = innerRef.current
+            const newZoom = parseFloat(Math.max(ZOOM_MIN, zoomRef.current - 0.1).toFixed(3))
+            if (inner) {
+              const cx = inner.clientWidth  / 2
+              const cy = inner.clientHeight / 2
+              const contentX = (cx + inner.scrollLeft) / zoomRef.current
+              const contentY = (cy + inner.scrollTop)  / zoomRef.current
+              applyZoom(newZoom, { x: contentX * newZoom - cx, y: contentY * newZoom - cy })
+            } else {
+              applyZoom(newZoom)
+            }
+          }}
+          aria-label="Zoom out"
+        >−</button>
+        <span ref={badgeTextRef}>{Math.round(zoom * 100)}%</span>
+        <button
+          className="canvas-zoom-btn"
+          onClick={() => {
+            const inner   = innerRef.current
+            const newZoom = parseFloat(Math.min(ZOOM_MAX, zoomRef.current + 0.1).toFixed(3))
+            if (inner) {
+              const cx = inner.clientWidth  / 2
+              const cy = inner.clientHeight / 2
+              const contentX = (cx + inner.scrollLeft) / zoomRef.current
+              const contentY = (cy + inner.scrollTop)  / zoomRef.current
+              applyZoom(newZoom, { x: contentX * newZoom - cx, y: contentY * newZoom - cy })
+            } else {
+              applyZoom(newZoom)
+            }
+          }}
+          aria-label="Zoom in"
+        >+</button>
       </div>
     </div>
   )
