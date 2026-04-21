@@ -18,7 +18,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-around;
   padding: 14px 8px 0;
   gap: 4px;
@@ -224,9 +224,12 @@
   flex-shrink: 0;
   font-family: var(--font-body);
   font-size: 16px;
+  font-weight: 500;
   color: #282828;
-  text-align: center;
-  padding: 10px 16px 0;
+  text-align: left;
+  padding: 13px 15px 13px;
+  border-top: 1px solid #cfcfcf;
+  border-bottom: 1px solid #cfcfcf;
 }
 
 /* ─── Separator ──────────────────────────────────────────────────────────────── */
@@ -234,7 +237,7 @@
 .photo-panel-bar {
   flex-shrink: 0;
   height: 3px;
-  background: var(--color-blue);
+  /* background: var(--color-blue); */
   margin: 10px 16px 0;
   border-radius: 0;
 }

@@ -12,27 +12,35 @@
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .layout-panel-header {
-  padding: 14px 0 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: left;
   gap: 10px;
   flex-shrink: 0;
+  text-align: left;
+  border-bottom: 1px solid rgb(207, 207, 207);
+  /* padding: 2.5px 15px 2.5px; */
+  padding-top: 2px;
+  padding-bottom: 0px;
+  padding-left: 10px;
+   margin-top: 3px;
+  margin-bottom: 15px;
 }
 
 .layout-panel-title {
   font-family: var(--font-body);
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--color-black);
 }
 
+/* 
 .layout-panel-bar {
   width: 167px;
   height: 3px;
   background: var(--color-blue);
   border-radius: 2px;
-}
+} */
 
 /* ── Photo count selector ────────────────────────────────────────────────── */
 

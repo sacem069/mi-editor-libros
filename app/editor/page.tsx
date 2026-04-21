@@ -6,7 +6,7 @@ import JSZip from 'jszip'
 import { jsPDF } from 'jspdf'
 import * as fabric from 'fabric'
 
-import Topbar      from '../components/Topbar/Topbar'
+const Topbar       = dynamic(() => import('../components/Topbar/Topbar'),       { ssr: false })
 import Toolbar     from '../components/Toolbar/Toolbar'
 import TextModal, { type TextOpts } from '../components/TextModal/TextModal'
 const PhotoPanel = dynamic(() => import('../components/PhotoPanel/PhotoPanel'), { ssr: false })
@@ -192,6 +192,9 @@ export default function EditorPage() {
       for (const page of [snapshot.left, snapshot.right]) {
         for (const frame of page.frames) {
           if (!frame.isEmpty && frame.photo) usedSrcs.add(frame.photo)
+        }
+        for (const fp of page.freePhotos ?? []) {
+          usedSrcs.add(fp.src)
         }
       }
     }

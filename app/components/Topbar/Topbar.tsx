@@ -42,12 +42,12 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
 
       <div className="topbar-actions">
         <button className="topbar-action-btn">
-          <Info size={18} strokeWidth={1.5} />
-          <span>{t.description}</span>
+          <Info size={22} strokeWidth={1.5} />
+          <span className="topbar-tooltip">{t.description}</span>
         </button>
         <button className="topbar-action-btn">
-          <Share2 size={18} strokeWidth={1.5} />
-          <span>{t.share}</span>
+          <Share2 size={22} strokeWidth={1.5} />
+          <span className="topbar-tooltip">{t.share}</span>
         </button>
 
         <div className="topbar-export-wrapper" ref={wrapperRef}>
@@ -56,8 +56,8 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
             onClick={() => setDropdownOpen((v) => !v)}
             disabled={isExporting}
           >
-            <ArrowDownToLine size={18} strokeWidth={1.5} />
-            <span>{isExporting ? t.exporting : t.save}</span>
+            <ArrowDownToLine size={22} strokeWidth={1.5} />
+            <span className="topbar-tooltip">{isExporting ? t.exporting : t.save}</span>
           </button>
 
           {dropdownOpen && (
@@ -79,8 +79,8 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
         </div>
 
         <button className="topbar-action-btn" onClick={onPreview}>
-          <Eye size={18} strokeWidth={1.5} />
-          <span>{t.preview}</span>
+          <Eye size={22} strokeWidth={1.5} />
+          <span className="topbar-tooltip">{t.preview}</span>
         </button>
       </div>
 
