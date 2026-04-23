@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
-import { X } from 'lucide-react'
+import { X, AlignLeft, AlignCenterHorizontal, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
 import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
@@ -126,6 +126,11 @@ export default function Canvas({
   type TextSel = { side: 'left' | 'right'; top: number; left: number; width: number } | null
   const [textSel,     setTextSel]     = useState<TextSel>(null)
   const [textEditing, setTextEditing] = useState(false)
+
+  // ── Multi-selection alignment toolbar ──────────────────────────────────────
+  type MultiSel = { side: 'left' | 'right'; selTop: number; selBottom: number; selLeft: number; selWidth: number } | null
+  const [multiSel, setMultiSel]     = useState<MultiSel>(null)
+  const suppressMultiSelRef = useRef(false)
 
   // ── Content-grabber (pan) state — refs avoid stale closure issues ────────
   const isPanMode    = useRef(false)
@@ -283,6 +288,81 @@ export default function Canvas({
     applyZoom(0.49)
   }, [applyZoom])
 
+  // ── Multi-selection alignment ──────────────────────────────────────────────
+  type AlignType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' | 'dist-h' | 'dist-v'
+  const applyAlignment = useCallback((type: AlignType) => {
+    if (!multiSel) return
+    const fc = multiSel.side === 'left' ? leftFabric.current : rightFabric.current
+    if (!fc) return
+
+    const objs = fc.getActiveObjects().slice()
+    if (objs.length < 2) return
+    const items = objs.map(obj => ({ obj, br: obj.getBoundingRect() }))
+    const selBR = {
+      left:   Math.min(...items.map(it => it.br.left)),
+      top:    Math.min(...items.map(it => it.br.top)),
+      right:  Math.max(...items.map(it => it.br.left + it.br.width)),
+      bottom: Math.max(...items.map(it => it.br.top  + it.br.height)),
+    }
+
+    suppressMultiSelRef.current = true
+    fc.discardActiveObject()
+
+    items.forEach(({ obj, br }) => {
+      switch (type) {
+        case 'left':
+          obj.set({ left: (obj.left ?? 0) + (selBR.left - br.left) }); break
+        case 'center-h':
+          obj.set({ left: (obj.left ?? 0) + ((selBR.left + selBR.right) / 2 - (br.left + br.width / 2)) }); break
+        case 'right':
+          obj.set({ left: (obj.left ?? 0) + (selBR.right - (br.left + br.width)) }); break
+        case 'top':
+          obj.set({ top: (obj.top ?? 0) + (selBR.top - br.top) }); break
+        case 'center-v':
+          obj.set({ top: (obj.top ?? 0) + ((selBR.top + selBR.bottom) / 2 - (br.top + br.height / 2)) }); break
+        case 'bottom':
+          obj.set({ top: (obj.top ?? 0) + (selBR.bottom - (br.top + br.height)) }); break
+      }
+      if (type !== 'dist-h' && type !== 'dist-v') obj.setCoords()
+    })
+
+    if (type === 'dist-h') {
+      const sorted = [...items].sort((a, b) => (a.br.left + a.br.width / 2) - (b.br.left + b.br.width / 2))
+      const firstCX = sorted[0].br.left + sorted[0].br.width / 2
+      const lastCX  = sorted.at(-1)!.br.left + sorted.at(-1)!.br.width / 2
+      const gap     = (lastCX - firstCX) / (sorted.length - 1)
+      sorted.forEach(({ obj, br }, i) => {
+        obj.set({ left: (obj.left ?? 0) + (firstCX + i * gap - (br.left + br.width / 2)) })
+        obj.setCoords()
+      })
+    }
+    if (type === 'dist-v') {
+      const sorted = [...items].sort((a, b) => (a.br.top + a.br.height / 2) - (b.br.top + b.br.height / 2))
+      const firstCY = sorted[0].br.top + sorted[0].br.height / 2
+      const lastCY  = sorted.at(-1)!.br.top + sorted.at(-1)!.br.height / 2
+      const gap     = (lastCY - firstCY) / (sorted.length - 1)
+      sorted.forEach(({ obj, br }, i) => {
+        obj.set({ top: (obj.top ?? 0) + (firstCY + i * gap - (br.top + br.height / 2)) })
+        obj.setCoords()
+      })
+    }
+
+    // Compute updated bounding rects (objects are standalone, so getBoundingRect is canvas-absolute)
+    const newBRs    = objs.map(obj => obj.getBoundingRect())
+    const newSelTop    = Math.min(...newBRs.map(br => br.top))
+    const newSelBottom = Math.max(...newBRs.map(br => br.top + br.height))
+    const newSelLeft   = Math.min(...newBRs.map(br => br.left))
+    const newSelRight  = Math.max(...newBRs.map(br => br.left + br.width))
+
+    const newSel = new fabric.ActiveSelection(objs, { canvas: fc })
+    fc.setActiveObject(newSel)
+    fc.renderAll()
+    suppressMultiSelRef.current = false
+
+    setMultiSel({ side: multiSel.side, selTop: newSelTop, selBottom: newSelBottom, selLeft: newSelLeft, selWidth: newSelRight - newSelLeft })
+    fc.fire('object:modified', { target: newSel })
+  }, [multiSel])
+
   // ── Mouse wheel / pinch zoom — direct DOM, no React state ────────────────
   useEffect(() => {
     const el = outerRef.current
@@ -393,6 +473,16 @@ export default function Canvas({
 
     // Track which canvas was last interacted with (for Ctrl+Z)
     let activeCanvas: fabric.Canvas = lc
+
+    const syncMultiSel = (fc: fabric.Canvas, side: 'left' | 'right') => {
+      if (suppressMultiSelRef.current) return
+      const objs = fc.getActiveObjects()
+      if (objs.length < 2) { setMultiSel(null); return }
+      const activeObj = fc.getActiveObject()
+      if (!activeObj) { setMultiSel(null); return }
+      const br = activeObj.getBoundingRect()
+      setMultiSel({ side, selTop: br.top, selBottom: br.top + br.height, selLeft: br.left, selWidth: br.width })
+    }
 
     // Converts a MouseEvent to canvas-local pixel coords, accounting for CSS scale on the parent.
     const toCanvasPoint = (fc: fabric.Canvas, e: MouseEvent) => {
@@ -516,15 +606,18 @@ export default function Canvas({
         onObjectSelectedRef.current(e.selected?.[0] ?? null)
         updateTextSel(e.selected?.[0], side)
         applyTextControls(e.selected?.[0])
+        syncMultiSel(fc, side)
       })
       fc.on('selection:updated', (e) => {
         onObjectSelectedRef.current(e.selected?.[0] ?? null)
         updateTextSel(e.selected?.[0], side)
         applyTextControls(e.selected?.[0])
+        syncMultiSel(fc, side)
       })
       fc.on('selection:cleared', () => {
         onObjectSelectedRef.current(null)
         setTextSel(null)
+        if (!suppressMultiSelRef.current) setMultiSel(null)
       })
       fc.on('object:modified', (e) => {
         if (e.target instanceof fabric.Textbox) {
@@ -532,6 +625,7 @@ export default function Canvas({
           setTextSel({ side, top: br.top, left: br.left, width: br.width })
         }
         saveHistory(fc)
+        syncMultiSel(fc, side)
       })
       fc.on('text:editing:entered', () => {
         const obj = fc.getActiveObject()
@@ -1025,6 +1119,20 @@ export default function Canvas({
                       <X size={9} strokeWidth={2.5} />
                     </button>
                   )}
+                  {multiSel?.side === 'left' && (
+                    <div className="canvas-align-toolbar" style={{ top: multiSel.selBottom + 8, left: multiSel.selLeft + multiSel.selWidth / 2 }}>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}         aria-label="Alinear izquierda"><AlignLeft size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}    aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}        aria-label="Alinear derecha"><AlignRight size={18} strokeWidth={1.5} /></button>
+                      <div className="canvas-align-sep" />
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}          aria-label="Alinear arriba"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}    aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}       aria-label="Alinear abajo"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
+                      <div className="canvas-align-sep" />
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}      aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}      aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1064,6 +1172,20 @@ export default function Canvas({
                     >
                       <X size={9} strokeWidth={2.5} />
                     </button>
+                  )}
+                  {multiSel?.side === 'right' && (
+                    <div className="canvas-align-toolbar" style={{ top: multiSel.selBottom + 8, left: multiSel.selLeft + multiSel.selWidth / 2 }}>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}         aria-label="Alinear izquierda"><AlignLeft size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}    aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}        aria-label="Alinear derecha"><AlignRight size={18} strokeWidth={1.5} /></button>
+                      <div className="canvas-align-sep" />
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}          aria-label="Alinear arriba"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}    aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}       aria-label="Alinear abajo"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
+                      <div className="canvas-align-sep" />
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}      aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}      aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                    </div>
                   )}
                 </div>
               </div>

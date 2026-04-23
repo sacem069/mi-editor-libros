@@ -248,6 +248,53 @@
   letter-spacing: 0.2px;
 }
 
+/* ─── Multi-selection alignment toolbar ─────────────────────────────────────── */
+
+.canvas-align-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  padding: 5px 6px;
+  z-index: 20;
+  transform: translateX(-50%);
+  line-height: 0;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.canvas-align-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #191919;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s;
+  flex-shrink: 0;
+}
+
+.canvas-align-btn:hover {
+  background: #F0EFEB;
+}
+
+.canvas-align-sep {
+  width: 1px;
+  height: 20px;
+  background: #E0E0E0;
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
 /* ─── Viewport pan overlay ───────────────────────────────────────────────────── */
 
 .canvas-vp-overlay {
