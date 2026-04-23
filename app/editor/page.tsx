@@ -783,40 +783,40 @@ export default function EditorPage() {
       <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} onExportPdf={handleExportPdf} isExporting={isExporting} />
 
       <div className="editor-body">
-        {viewMode === 'spreads' ? (
-          <SpreadsView
-            thumbnails={thumbnails}
-            totalSpreads={totalSpreads}
-            currentSpread={currentSpread}
+        <PhotoPanel
+          photos={photos}
+          usedPhotoIds={usedPhotoIds}
+          onUpload={handlePhotoUpload}
+          onPhotoClick={handlePhotoClick}
+          onDelete={handlePhotoDelete}
+          onAutoCreate={handleAutoCreate}
+        />
+
+        <div className="editor-center">
+          <Toolbar
+            canUndo={canUndo}
+            canRedo={canRedo}
+            showBleed={showBleed}
+            panMode={panMode}
             viewMode={viewMode}
-            onSpreadSelect={handleSpreadsViewSelect}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onToggleBleed={handleToggleBleed}
+            onAddText={handleAddText}
+            onPanModeToggle={handlePanModeToggle}
             onViewModeChange={handleViewModeChange}
-            onReorderSpreads={handleReorderSpreads}
           />
-        ) : (
-          <>
-            <PhotoPanel
-              photos={photos}
-              usedPhotoIds={usedPhotoIds}
-              onUpload={handlePhotoUpload}
-              onPhotoClick={handlePhotoClick}
-              onDelete={handlePhotoDelete}
-              onAutoCreate={handleAutoCreate}
+
+          {viewMode === 'spreads' ? (
+            <SpreadsView
+              thumbnails={thumbnails}
+              totalSpreads={totalSpreads}
+              currentSpread={currentSpread}
+              onSpreadSelect={handleSpreadsViewSelect}
+              onReorderSpreads={handleReorderSpreads}
             />
-
-            <div className="editor-center">
-              <Toolbar
-                canUndo={canUndo}
-                canRedo={canRedo}
-                showBleed={showBleed}
-                panMode={panMode}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                onToggleBleed={handleToggleBleed}
-                onAddText={handleAddText}
-                onPanModeToggle={handlePanModeToggle}
-              />
-
+          ) : (
+            <>
               <Canvas
                 zoom={zoom}
                 showBleed={showBleed}
@@ -832,7 +832,6 @@ export default function EditorPage() {
                 onLayoutDropOnPage={handleLayoutDropOnPage}
                 onPhotoDrop={handlePhotoDrop}
                 onTextEdit={handleTextEdit}
-                onViewModeChange={handleViewModeChange}
               />
 
               <PageStrip
@@ -844,16 +843,16 @@ export default function EditorPage() {
                 onLayoutDrop={handleLayoutDrop}
                 thumbnails={thumbnails}
               />
-            </div>
+            </>
+          )}
+        </div>
 
-            <LayoutPanel
-              selectedPhotoCount={selectedPhotoCount}
-              selectedLayoutId={selectedLayoutId}
-              onPhotoCountChange={setSelectedPhotoCount}
-              onLayoutSelect={handleLayoutSelect}
-            />
-          </>
-        )}
+        <LayoutPanel
+          selectedPhotoCount={selectedPhotoCount}
+          selectedLayoutId={selectedLayoutId}
+          onPhotoCountChange={setSelectedPhotoCount}
+          onLayoutSelect={handleLayoutSelect}
+        />
       </div>
     </div>
 

@@ -10,51 +10,12 @@
   min-height: 0;
 }
 
-/* ─── View toggle — fixed top-right regardless of scroll ─────────────────────── */
-
-.spreads-view-toggle {
-  position: absolute;
-  top: 52px;
-  right: 216px;
-  display: flex;
-  z-index: 20;
-}
-
-.spreads-view-btn {
-  width: 26px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #474747;
-  background: #f0f0f0;
-  cursor: pointer;
-  color: #474747;
-  padding: 0;
-  transition: background 0.1s;
-}
-
-.spreads-view-btn:first-child {
-  border-radius: 2px 0 0 2px;
-  border-right: none;
-}
-
-.spreads-view-btn:last-child {
-  border-radius: 0 2px 2px 0;
-}
-
-.spreads-view-btn--active {
-  background: #fefefe;
-  border-color: #191919;
-  color: #191919;
-}
-
 /* ─── Scrollable area — centers the 70% grid ────────────────────────────────── */
 
 .spreads-scroll {
   flex: 1;
   overflow-y: auto;
-  padding-top: 110px;
+  padding-top: 40px;
 }
 
 /* ─── 55% width wrapper ──────────────────────────────────────────────────────── */

@@ -7,9 +7,7 @@ interface SpreadsViewProps {
   thumbnails: Record<number, { left: string; right: string }>
   totalSpreads: number
   currentSpread: number
-  viewMode: 'editor' | 'spreads'
   onSpreadSelect: (spread: number) => void
-  onViewModeChange: (mode: 'editor' | 'spreads') => void
   onReorderSpreads: (fromIndex: number, toIndex: number) => void
 }
 
@@ -29,9 +27,7 @@ export default function SpreadsView({
   thumbnails,
   totalSpreads,
   currentSpread,
-  viewMode,
   onSpreadSelect,
-  onViewModeChange,
   onReorderSpreads,
 }: SpreadsViewProps) {
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
@@ -72,31 +68,6 @@ export default function SpreadsView({
 
   return (
     <div className="spreads-root">
-
-      {/* ── View toggle ── */}
-      <div className="spreads-view-toggle">
-        <button
-          className={`spreads-view-btn${viewMode === 'editor' ? ' spreads-view-btn--active' : ''}`}
-          onClick={() => onViewModeChange('editor')}
-          aria-label="Vista de edición"
-        >
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
-            <rect x="0.5" y="0.5" width="16" height="11" rx="1.5" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-        <button
-          className={`spreads-view-btn${viewMode === 'spreads' ? ' spreads-view-btn--active' : ''}`}
-          onClick={() => onViewModeChange('spreads')}
-          aria-label="Vista de spreads"
-        >
-          <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
-            <rect x="0.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="9.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="0.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="9.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-      </div>
 
       {/* ── Spreads grid ── */}
       <div className="spreads-scroll">

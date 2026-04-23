@@ -13,10 +13,12 @@
   position: absolute;
   inset: 0;
   overflow: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 32px;
+}
+
+/* Adds uniform padding around the spread to create pan room in all directions */
+.canvas-scroll-pad {
+  display: inline-block;
+  padding: 400px;
 }
 
 /* Reserves the exact scaled space for the spread */
@@ -244,45 +246,6 @@
   white-space: nowrap;
   z-index: 10;
   letter-spacing: 0.2px;
-}
-
-/* ─── View toggle ────────────────────────────────────────────────────────────── */
-
-.canvas-view-toggle {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  display: flex;
-  z-index: 40;
-}
-
-.canvas-view-btn {
-  width: 26px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #474747;
-  background: #f0f0f0;
-  cursor: pointer;
-  color: #474747;
-  padding: 0;
-  transition: background 0.1s;
-}
-
-.canvas-view-btn:first-child {
-  border-radius: 2px 0 0 2px;
-  border-right: none;
-}
-
-.canvas-view-btn:last-child {
-  border-radius: 0 2px 2px 0;
-}
-
-.canvas-view-btn--active {
-  background: #fefefe;
-  border-color: #191919;
-  color: #191919;
 }
 
 /* ─── Viewport pan overlay ───────────────────────────────────────────────────── */

@@ -22,6 +22,7 @@ const SPREAD_H = PAGE_NUM + PAGE_H + NAV   // 1162
 
 const ZOOM_MIN = 0.1
 const ZOOM_MAX = 5.0
+const SCROLL_PAD = 400
 
 const MAX_HISTORY = 20
 
@@ -40,7 +41,6 @@ interface CanvasProps {
   onLayoutDropOnPage: (layoutId: string, page: 'left' | 'right') => void
   onPhotoDrop: (photoId: string) => void
   onTextEdit?: (textbox: fabric.Textbox, side: 'left' | 'right') => void
-  onViewModeChange: (mode: 'editor' | 'spreads') => void
 }
 
 function spreadLabel(spread: number, totalSpreads: number, back: string, cover: string): { left: string; right: string } {
@@ -92,7 +92,6 @@ export default function Canvas({
   onLayoutDropOnPage,
   onPhotoDrop,
   onTextEdit,
-  onViewModeChange,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
@@ -202,11 +201,24 @@ export default function Canvas({
       isVPDragging.current = false
       if (vpOverlayRef.current) vpOverlayRef.current.style.cursor = 'grab'
     }
+    // Forward non-zoom wheel events to canvas-inner (overlay is a sibling, not an ancestor)
+    const overlay = vpOverlayRef.current
+    const onOverlayWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return  // let it bubble to outerRef for zoom
+      e.preventDefault()
+      const inner = innerRef.current
+      if (inner) {
+        inner.scrollLeft += e.deltaX
+        inner.scrollTop  += e.deltaY
+      }
+    }
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup',   onMouseUp)
+    if (overlay) overlay.addEventListener('wheel', onOverlayWheel, { passive: false })
     return () => {
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup',   onMouseUp)
+      if (overlay) overlay.removeEventListener('wheel', onOverlayWheel)
     }
   }, [isViewportPanning])
 
@@ -225,6 +237,9 @@ export default function Canvas({
     if (scrollTo) {
       inner.scrollLeft = Math.max(0, scrollTo.x)
       inner.scrollTop  = Math.max(0, scrollTo.y)
+    } else {
+      inner.scrollLeft = Math.round((inner.scrollWidth  - inner.clientWidth)  / 2)
+      inner.scrollTop  = Math.round((inner.scrollHeight - inner.clientHeight) / 2)
     }
 
     zoomRef.current = newZoom
@@ -235,10 +250,10 @@ export default function Canvas({
     }, 150)
   }, [])
 
-  // ── Initial zoom: hardcoded 49% ──────────────────────────────────────────
+  // ── Initial zoom: hardcoded 49%, centers the scroll viewport ────────────
   useEffect(() => {
-    onZoomChangeRef.current(0.49)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    applyZoom(0.49)
+  }, [applyZoom])
 
   // ── Mouse wheel / pinch zoom — direct DOM, no React state ────────────────
   useEffect(() => {
@@ -255,8 +270,8 @@ export default function Canvas({
       const rect    = inner.getBoundingClientRect()
       const cursorX = e.clientX - rect.left
       const cursorY = e.clientY - rect.top
-      const contentX = (cursorX + inner.scrollLeft) / zoomRef.current
-      const contentY = (cursorY + inner.scrollTop)  / zoomRef.current
+      const contentX = (cursorX + inner.scrollLeft - SCROLL_PAD) / zoomRef.current
+      const contentY = (cursorY + inner.scrollTop  - SCROLL_PAD) / zoomRef.current
 
       let dy = e.deltaY
       if (e.deltaMode === 1) dy *= 16
@@ -268,8 +283,8 @@ export default function Canvas({
       if (newZoom === zoomRef.current) return
 
       applyZoom(newZoom, {
-        x: contentX * newZoom - cursorX,
-        y: contentY * newZoom - cursorY,
+        x: contentX * newZoom - cursorX + SCROLL_PAD,
+        y: contentY * newZoom - cursorY + SCROLL_PAD,
       })
     }
 
@@ -881,6 +896,7 @@ export default function Canvas({
     <div className="canvas-outer" ref={outerRef}>
       {/* ── Scrollable + centered area ── */}
       <div className="canvas-inner" ref={innerRef}>
+        <div className="canvas-scroll-pad">
         <div className="canvas-scale-anchor" ref={scaleAnchorRef} style={{ width: scaledW, height: scaledH }}>
           <div
             className="canvas-spread-root"
@@ -993,6 +1009,7 @@ export default function Canvas({
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* ── Viewport pan overlay — intercepts all pointer events during pan mode ── */}
@@ -1009,31 +1026,6 @@ export default function Canvas({
         />
       )}
 
-      {/* ── View toggle ── */}
-      <div className="canvas-view-toggle">
-        <button
-          className={`canvas-view-btn${viewMode === 'editor' ? ' canvas-view-btn--active' : ''}`}
-          onClick={() => onViewModeChange('editor')}
-          aria-label="Vista de edición"
-        >
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
-            <rect x="0.5" y="0.5" width="16" height="11" rx="1.5" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-        <button
-          className={`canvas-view-btn${viewMode === 'spreads' ? ' canvas-view-btn--active' : ''}`}
-          onClick={() => onViewModeChange('spreads')}
-          aria-label="Vista de spreads"
-        >
-          <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
-            <rect x="0.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="9.5" y="0.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="0.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-            <rect x="9.5" y="7.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-      </div>
-
       {/* ── Zoom controls ── */}
       <div className="canvas-zoom-badge">
         <button
@@ -1044,9 +1036,9 @@ export default function Canvas({
             if (inner) {
               const cx = inner.clientWidth  / 2
               const cy = inner.clientHeight / 2
-              const contentX = (cx + inner.scrollLeft) / zoomRef.current
-              const contentY = (cy + inner.scrollTop)  / zoomRef.current
-              applyZoom(newZoom, { x: contentX * newZoom - cx, y: contentY * newZoom - cy })
+              const contentX = (cx + inner.scrollLeft - SCROLL_PAD) / zoomRef.current
+              const contentY = (cy + inner.scrollTop  - SCROLL_PAD) / zoomRef.current
+              applyZoom(newZoom, { x: contentX * newZoom - cx + SCROLL_PAD, y: contentY * newZoom - cy + SCROLL_PAD })
             } else {
               applyZoom(newZoom)
             }
@@ -1062,9 +1054,9 @@ export default function Canvas({
             if (inner) {
               const cx = inner.clientWidth  / 2
               const cy = inner.clientHeight / 2
-              const contentX = (cx + inner.scrollLeft) / zoomRef.current
-              const contentY = (cy + inner.scrollTop)  / zoomRef.current
-              applyZoom(newZoom, { x: contentX * newZoom - cx, y: contentY * newZoom - cy })
+              const contentX = (cx + inner.scrollLeft - SCROLL_PAD) / zoomRef.current
+              const contentY = (cy + inner.scrollTop  - SCROLL_PAD) / zoomRef.current
+              applyZoom(newZoom, { x: contentX * newZoom - cx + SCROLL_PAD, y: contentY * newZoom - cy + SCROLL_PAD })
             } else {
               applyZoom(newZoom)
             }
