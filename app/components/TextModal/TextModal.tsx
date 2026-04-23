@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   X, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  CirclePlus, CircleMinus,
+  CirclePlus, CircleMinus, ChevronDown,
 } from 'lucide-react'
 import './TextModal.css'
 
@@ -60,12 +60,25 @@ export default function TextModal({
   const [fontSize,   setFontSize]   = useState(initialSize  || 24)
   const [fill,       setFill]       = useState(initialColor || '#191919')
 
-  const colorInputRef = useRef<HTMLInputElement>(null)
-  const textareaRef   = useRef<HTMLTextAreaElement>(null)
+  const [fontPickerOpen, setFontPickerOpen] = useState(false)
+  const colorInputRef  = useRef<HTMLInputElement>(null)
+  const textareaRef    = useRef<HTMLTextAreaElement>(null)
+  const fontPickerRef  = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (!fontPickerOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (fontPickerRef.current && !fontPickerRef.current.contains(e.target as Node)) {
+        setFontPickerOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [fontPickerOpen])
 
   const alignments = [
     { value: 'left',    Icon: AlignLeft,    label: 'Izquierda' },
@@ -92,15 +105,32 @@ export default function TextModal({
         <div className="tm-toolbar">
 
           {/* Font picker */}
-          <select
-            className="tm-font-select"
-            value={fontFamily}
-            onChange={(e) => setFontFamily(e.target.value)}
-          >
-            {TEXT_FONTS.map((f) => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
+          <div className="tm-font-picker" ref={fontPickerRef}>
+            <button
+              className="tm-font-btn"
+              style={{ fontFamily }}
+              onClick={() => setFontPickerOpen((v) => !v)}
+              type="button"
+            >
+              <span>{TEXT_FONTS.find((f) => f.value === fontFamily)?.label ?? fontFamily}</span>
+              <ChevronDown size={10} strokeWidth={2} />
+            </button>
+            {fontPickerOpen && (
+              <div className="tm-font-list">
+                {TEXT_FONTS.map((f) => (
+                  <button
+                    key={f.value}
+                    className={`tm-font-option${fontFamily === f.value ? ' tm-font-option--active' : ''}`}
+                    style={{ fontFamily: f.value }}
+                    onClick={() => { setFontFamily(f.value); setFontPickerOpen(false) }}
+                    type="button"
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="tm-sep" />
 

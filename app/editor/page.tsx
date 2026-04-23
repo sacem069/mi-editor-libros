@@ -73,9 +73,10 @@ export default function EditorPage() {
   const [selectedPhotoCount, setSelectedPhotoCount] = useState(1)
 
   // ── Canvas settings ────────────────────────────────────────────────────────
-  const [zoom,      setZoom]      = useState(0.75) // overridden by Canvas on mount
-  const [showBleed, setShowBleed] = useState(false)
-  const [panMode,   setPanMode]   = useState(false)
+  const [zoom,           setZoom]           = useState(0.75) // overridden by Canvas on mount
+  const [showBleed,      setShowBleed]      = useState(false)
+  const [panMode,        setPanMode]        = useState(false)
+  const [activePageBg,   setActivePageBg]   = useState('#FFFFFF')
 
   // ── History (undo / redo) ──────────────────────────────────────────────────
   const [canUndo, setCanUndo] = useState(false)
@@ -217,6 +218,38 @@ export default function EditorPage() {
     } catch (_) { /* canvas not ready */ }
   }, [])
 
+  // ── Render a single page to a small thumbnail from saved PageData ─────────
+  // Fast-path for empty pages (pure 2D fill); full Fabric render for pages with content.
+  const renderPageThumb = useCallback((pageData: PageData): Promise<string> => {
+    const THUMB_W = 82
+    const THUMB_H = 106
+    const isEmpty =
+      pageData.frames.length === 0 &&
+      pageData.texts.length  === 0 &&
+      (pageData.freePhotos?.length ?? 0) === 0
+    if (isEmpty) {
+      const c = document.createElement('canvas')
+      c.width = THUMB_W; c.height = THUMB_H
+      const ctx = c.getContext('2d')!
+      ctx.fillStyle = pageData.background || '#ffffff'
+      ctx.fillRect(0, 0, THUMB_W, THUMB_H)
+      return Promise.resolve(c.toDataURL('image/jpeg', 0.85))
+    }
+    return exportPageAsJpg(pageData, PAGE_W, PAGE_H, THUMB_W / PAGE_W)
+  }, [])
+
+  // ── Regenerate thumbnails for all non-current spreads from spreadsData ─────
+  const regenerateThumbnails = useCallback((currentIdx: number, total: number) => {
+    for (let i = 0; i < total; i++) {
+      if (i === currentIdx) continue
+      const snap = spreadsData.current[i]
+      if (!snap) continue
+      Promise.all([renderPageThumb(snap.left), renderPageThumb(snap.right)]).then(([left, right]) => {
+        setThumbnails(prev => ({ ...prev, [i]: { left, right } }))
+      })
+    }
+  }, [renderPageThumb])
+
   // ── Push a snapshot to undo history ───────────────────────────────────────
   const pushHistory = useCallback(() => {
     const lc = fabricLeft.current
@@ -290,6 +323,8 @@ export default function EditorPage() {
   // ── Active page change (fired by Canvas on mousedown) ─────────────────────
   const handleActivePageChange = useCallback((page: 'left' | 'right') => {
     activePageRef.current = page
+    const fc = page === 'right' ? fabricRight.current : fabricLeft.current
+    if (fc) setActivePageBg((fc.backgroundColor as string) || '#FFFFFF')
   }, [])
 
   // ── Photo upload ───────────────────────────────────────────────────────────
@@ -463,6 +498,8 @@ export default function EditorPage() {
       } else {
         lc.remove(...lc.getObjects())
         rc.remove(...rc.getObjects())
+        lc.backgroundColor = '#ffffff'
+        rc.backgroundColor = '#ffffff'
         lc.renderAll()
         rc.renderAll()
       }
@@ -476,6 +513,10 @@ export default function EditorPage() {
     setCanUndo(false)
     setCanRedo(false)
     pushHistory()
+
+    // Sync background swatch to the newly loaded active page
+    const activeFc = activePageRef.current === 'right' ? fabricRight.current : fabricLeft.current
+    if (activeFc) setActivePageBg((activeFc.backgroundColor as string) || '#FFFFFF')
   }, [pushHistory, captureThumbnail])
 
   // ── Add spread ─────────────────────────────────────────────────────────────
@@ -621,7 +662,12 @@ export default function EditorPage() {
 
     recomputeUsedPhotos()
     await handleSpreadSelect(1)
-  }, [totalContentSpreads, recomputeUsedPhotos, handleSpreadSelect])
+
+    // After handleSpreadSelect resolves the canvases are fully loaded — capture
+    // spread 1 directly, then render all other spreads from their saved PageData.
+    captureThumbnail(currentSpreadRef.current)
+    regenerateThumbnails(currentSpreadRef.current, totalContentSpreads + 3)
+  }, [totalContentSpreads, recomputeUsedPhotos, handleSpreadSelect, captureThumbnail, regenerateThumbnails])
 
   // ── Zoom ───────────────────────────────────────────────────────────────────
   const handleZoomChange = useCallback((z: number) => setZoom(z), [])
@@ -631,6 +677,47 @@ export default function EditorPage() {
 
   // ── Viewport pan mode ─────────────────────────────────────────────────────
   const handlePanModeToggle = useCallback(() => setPanMode((v) => !v), [])
+
+  // ── Page background color ─────────────────────────────────────────────────
+  const handlePageBgChange = useCallback((color: string) => {
+    const fc = getActiveFabric()
+    if (!fc) return
+    fc.backgroundColor = color
+    fc.renderAll()
+    setActivePageBg(color)
+    saveCurrentSpread()
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Apply background to all pages ─────────────────────────────────────────
+  const handleApplyBgToAll = useCallback(() => {
+    const color = activePageBg
+    const blankPage = (): PageData => ({ background: color, pageW: PAGE_W, pageH: PAGE_H, frames: [], texts: [] })
+
+    // Cover every spread — visited ones get their content preserved, unvisited
+    // ones get a minimal entry so deserializePage will apply the color on first load.
+    for (let i = 0; i < totalSpreads; i++) {
+      const snap = spreadsData.current[i]
+      if (snap) {
+        spreadsData.current[i] = {
+          left:  { ...snap.left,  background: color },
+          right: { ...snap.right, background: color },
+        }
+      } else {
+        spreadsData.current[i] = { left: blankPage(), right: blankPage() }
+      }
+    }
+
+    // Apply live to the two visible canvases
+    const lc = fabricLeft.current
+    const rc = fabricRight.current
+    if (lc) { lc.backgroundColor = color; lc.renderAll() }
+    if (rc) { rc.backgroundColor = color; rc.renderAll() }
+    saveCurrentSpread()
+
+    // Regenerate thumbnails so the page strip reflects the new color immediately.
+    captureThumbnail(currentSpreadRef.current)
+    regenerateThumbnails(currentSpreadRef.current, totalSpreads)
+  }, [activePageBg, totalSpreads, saveCurrentSpread, captureThumbnail, regenerateThumbnails])
 
   // ── Object selected (future: show properties) ─────────────────────────────
   const handleObjectSelected = useCallback((_obj: fabric.FabricObject | null) => {
@@ -799,12 +886,15 @@ export default function EditorPage() {
             showBleed={showBleed}
             panMode={panMode}
             viewMode={viewMode}
+            pageBackground={activePageBg}
             onUndo={handleUndo}
             onRedo={handleRedo}
             onToggleBleed={handleToggleBleed}
             onAddText={handleAddText}
             onPanModeToggle={handlePanModeToggle}
             onViewModeChange={handleViewModeChange}
+            onPageBgChange={handlePageBgChange}
+            onApplyBgToAll={handleApplyBgToAll}
           />
 
           {viewMode === 'spreads' ? (

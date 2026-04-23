@@ -406,7 +406,7 @@ export function addTextBox(
     top: pageH / 2,
     originX: 'center',
     originY: 'center',
-    width: pageW * 0.5,
+    width: pageW * 0.22,
     fontFamily: 'amandine',
     fontSize: 24,
     fill: '#191919',
@@ -539,7 +539,7 @@ export function serializePage(
   }
 
   return {
-    background: '#FFFFFF',
+    background: (canvas.backgroundColor as string) || '#FFFFFF',
     pageW,
     pageH,
     frames,
@@ -628,6 +628,7 @@ export async function deserializePage(
   pageH: number,
 ): Promise<void> {
   canvas.remove(...canvas.getObjects())
+  canvas.backgroundColor = pageData.background || '#ffffff'
 
   for (const sf of pageData.frames) {
     if (sf.isEmpty) {
