@@ -10,6 +10,7 @@ interface ToolbarProps {
   canRedo: boolean
   showBleed: boolean
   panMode: boolean
+  frameTool: boolean
   viewMode: 'editor' | 'spreads'
   pageBackground: string
   onUndo: () => void
@@ -17,6 +18,7 @@ interface ToolbarProps {
   onToggleBleed: () => void
   onAddText: () => void
   onPanModeToggle: () => void
+  onFrameToolToggle: () => void
   onViewModeChange: (mode: 'editor' | 'spreads') => void
   onPageBgChange: (color: string) => void
   onApplyBgToAll: () => void
@@ -27,6 +29,7 @@ export default function Toolbar({
   canRedo,
   showBleed,
   panMode,
+  frameTool,
   viewMode,
   pageBackground,
   onUndo,
@@ -34,6 +37,7 @@ export default function Toolbar({
   onToggleBleed,
   onAddText,
   onPanModeToggle,
+  onFrameToolToggle,
   onViewModeChange,
   onPageBgChange,
   onApplyBgToAll,
@@ -99,7 +103,8 @@ export default function Toolbar({
         </button>
 
         <button
-          className="toolbar-btn"
+          className={`toolbar-btn${frameTool ? ' toolbar-btn--active' : ''}`}
+          onClick={onFrameToolToggle}
           aria-label="Marco foto"
         >
           <ImageUpscale size={22} strokeWidth={1.5} />

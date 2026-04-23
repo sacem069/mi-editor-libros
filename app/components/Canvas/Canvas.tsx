@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
 import { X } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
-import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame } from './fabricHelpers'
+import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
 import './Canvas.css'
 
@@ -33,6 +33,7 @@ interface CanvasProps {
   totalSpreads: number
   viewMode: 'editor' | 'spreads'
   panMode: boolean
+  frameTool: boolean
   onObjectSelected: (obj: fabric.FabricObject | null) => void
   onCanvasReady: (left: fabric.Canvas, right: fabric.Canvas) => void
   onSpreadChange: (spread: number) => void
@@ -41,6 +42,7 @@ interface CanvasProps {
   onLayoutDropOnPage: (layoutId: string, page: 'left' | 'right') => void
   onPhotoDrop: (photoId: string) => void
   onTextEdit?: (textbox: fabric.Textbox, side: 'left' | 'right') => void
+  onFrameToolDeactivate: () => void
 }
 
 function spreadLabel(spread: number, totalSpreads: number, back: string, cover: string): { left: string; right: string } {
@@ -84,6 +86,7 @@ export default function Canvas({
   totalSpreads,
   viewMode,
   panMode,
+  frameTool,
   onObjectSelected,
   onCanvasReady,
   onSpreadChange,
@@ -92,6 +95,7 @@ export default function Canvas({
   onLayoutDropOnPage,
   onPhotoDrop,
   onTextEdit,
+  onFrameToolDeactivate,
 }: CanvasProps) {
   const leftElRef   = useRef<HTMLCanvasElement>(null)
   const rightElRef  = useRef<HTMLCanvasElement>(null)
@@ -133,6 +137,16 @@ export default function Canvas({
     startTop:  number
   } | null>(null)
 
+  // ── Frame draw tool state ─────────────────────────────────────────────────
+  const isFrameToolRef = useRef(false)
+  const frameDrawRef   = useRef<{
+    canvas:  fabric.Canvas
+    startX:  number
+    startY:  number
+    preview: fabric.Rect
+  } | null>(null)
+  const onFrameToolDeactivateRef = useRef(onFrameToolDeactivate)
+
   // ── Per-canvas undo history ───────────────────────────────────────────────
   const lcHistoryRef = useRef<string[]>([])
   const rcHistoryRef = useRef<string[]>([])
@@ -155,7 +169,8 @@ export default function Canvas({
   useEffect(() => { onActivePageChangeRef.current  = onActivePageChange  }, [onActivePageChange])
   useEffect(() => { onLayoutDropOnPageRef.current  = onLayoutDropOnPage  }, [onLayoutDropOnPage])
   useEffect(() => { onPhotoDropRef.current         = onPhotoDrop         }, [onPhotoDrop])
-  useEffect(() => { onTextEditRef.current          = onTextEdit          }, [onTextEdit])
+  useEffect(() => { onTextEditRef.current               = onTextEdit               }, [onTextEdit])
+  useEffect(() => { onFrameToolDeactivateRef.current    = onFrameToolDeactivate    }, [onFrameToolDeactivate])
   useEffect(() => { zoomRef.current = zoom }, [zoom])
   useEffect(() => { isTextEditingRef.current = textEditing }, [textEditing])
 
@@ -181,6 +196,19 @@ export default function Canvas({
       document.removeEventListener('keyup',   onKeyUp)
     }
   }, [])
+
+  // ── Frame draw tool: crosshair cursor + block object selection ───────────
+  useEffect(() => {
+    isFrameToolRef.current = frameTool
+    const lc = leftFabric.current
+    const rc = rightFabric.current
+    if (!lc || !rc) return
+    ;[lc, rc].forEach(fc => {
+      fc.defaultCursor  = frameTool ? 'crosshair' : 'default'
+      fc.skipTargetFind = frameTool
+      fc.renderAll()
+    })
+  }, [frameTool])
 
   // ── Viewport drag: move scroll while overlay is up ────────────────────────
   const isViewportPanning = panMode || spacebarPan
@@ -366,11 +394,33 @@ export default function Canvas({
     // Track which canvas was last interacted with (for Ctrl+Z)
     let activeCanvas: fabric.Canvas = lc
 
+    // Converts a MouseEvent to canvas-local pixel coords, accounting for CSS scale on the parent.
+    const toCanvasPoint = (fc: fabric.Canvas, e: MouseEvent) => {
+      const r = fc.upperCanvasEl.getBoundingClientRect()
+      return { x: (e.clientX - r.left) * (PAGE_W / r.width), y: (e.clientY - r.top) * (PAGE_H / r.height) }
+    }
+
     const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
       fc.on('mouse:down', (e) => {
         setActivePage(side)
         onActivePageChangeRef.current(side)
         activeCanvas = fc
+
+        // ── Frame draw tool ───────────────────────────────────────────────────
+        if (isFrameToolRef.current) {
+          const ptr     = toCanvasPoint(fc, e.e as MouseEvent)
+          const preview = new fabric.Rect({
+            left: ptr.x, top: ptr.y, width: 0, height: 0,
+            originX: 'left', originY: 'top',
+            fill: '#F0EFEB', stroke: '#528ED6', strokeWidth: 1,
+            strokeDashArray: [5, 5], strokeUniform: true,
+            selectable: false, evented: false,
+          })
+          fc.add(preview)
+          frameDrawRef.current = { canvas: fc, startX: ptr.x, startY: ptr.y, preview }
+          fc.renderAll()
+          return
+        }
 
         if (isPanMode.current && panTargetRef.current) {
           const img  = panTargetRef.current
@@ -397,6 +447,18 @@ export default function Canvas({
 
       // ── Mouse move: pan the photo inside its fixed clipPath ───────────────
       fc.on('mouse:move', (e) => {
+        if (frameDrawRef.current?.canvas === fc) {
+          const { startX, startY, preview } = frameDrawRef.current
+          const ptr = toCanvasPoint(fc, e.e as MouseEvent)
+          preview.set({
+            left:   Math.min(ptr.x, startX),
+            top:    Math.min(ptr.y, startY),
+            width:  Math.abs(ptr.x - startX),
+            height: Math.abs(ptr.y - startY),
+          })
+          fc.renderAll()
+          return
+        }
         if (isPanMode.current && panData.current) {
           const rect = fc.upperCanvasEl.getBoundingClientRect()
           const x    = (e.e as MouseEvent).clientX - rect.left
@@ -410,8 +472,25 @@ export default function Canvas({
         }
       })
 
-      // ── Mouse up: persist panned position ────────────────────────────────
+      // ── Mouse up: finalize frame draw or persist panned position ─────────
       fc.on('mouse:up', () => {
+        if (frameDrawRef.current?.canvas === fc) {
+          const { preview, canvas } = frameDrawRef.current
+          const frameX = preview.left   ?? 0
+          const frameY = preview.top    ?? 0
+          const frameW = preview.width  ?? 0
+          const frameH = preview.height ?? 0
+          canvas.remove(preview)
+          frameDrawRef.current = null
+          if (frameW > 10 && frameH > 10) {
+            const frame = createFrameAtPx(canvas, frameX, frameY, frameW, frameH)
+            canvas.setActiveObject(frame)
+            saveHistory(canvas)
+            onFrameToolDeactivateRef.current()
+          }
+          canvas.renderAll()
+          return
+        }
         if (panData.current) {
           panData.current.img.data.imgLeft = panData.current.img.left ?? 0
           panData.current.img.data.imgTop  = panData.current.img.top  ?? 0

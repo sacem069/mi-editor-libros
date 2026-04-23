@@ -76,6 +76,7 @@ export default function EditorPage() {
   const [zoom,           setZoom]           = useState(0.75) // overridden by Canvas on mount
   const [showBleed,      setShowBleed]      = useState(false)
   const [panMode,        setPanMode]        = useState(false)
+  const [frameTool,      setFrameTool]      = useState(false)
   const [activePageBg,   setActivePageBg]   = useState('#FFFFFF')
 
   // ── History (undo / redo) ──────────────────────────────────────────────────
@@ -676,7 +677,17 @@ export default function EditorPage() {
   const handleToggleBleed = useCallback(() => setShowBleed((v) => !v), [])
 
   // ── Viewport pan mode ─────────────────────────────────────────────────────
-  const handlePanModeToggle = useCallback(() => setPanMode((v) => !v), [])
+  const handlePanModeToggle = useCallback(() => {
+    setPanMode((v) => !v)
+    setFrameTool(false)
+  }, [])
+
+  // ── Frame draw tool ────────────────────────────────────────────────────────
+  const handleFrameToolToggle = useCallback(() => {
+    setFrameTool((v) => !v)
+    setPanMode(false)
+  }, [])
+  const handleFrameToolDeactivate = useCallback(() => setFrameTool(false), [])
 
   // ── Page background color ─────────────────────────────────────────────────
   const handlePageBgChange = useCallback((color: string) => {
@@ -885,6 +896,7 @@ export default function EditorPage() {
             canRedo={canRedo}
             showBleed={showBleed}
             panMode={panMode}
+            frameTool={frameTool}
             viewMode={viewMode}
             pageBackground={activePageBg}
             onUndo={handleUndo}
@@ -892,6 +904,7 @@ export default function EditorPage() {
             onToggleBleed={handleToggleBleed}
             onAddText={handleAddText}
             onPanModeToggle={handlePanModeToggle}
+            onFrameToolToggle={handleFrameToolToggle}
             onViewModeChange={handleViewModeChange}
             onPageBgChange={handlePageBgChange}
             onApplyBgToAll={handleApplyBgToAll}
@@ -914,6 +927,7 @@ export default function EditorPage() {
                 totalSpreads={totalSpreads}
                 viewMode={viewMode}
                 panMode={panMode}
+                frameTool={frameTool}
                 onObjectSelected={handleObjectSelected}
                 onCanvasReady={handleCanvasReady}
                 onSpreadChange={handleSpreadSelect}
@@ -922,6 +936,7 @@ export default function EditorPage() {
                 onLayoutDropOnPage={handleLayoutDropOnPage}
                 onPhotoDrop={handlePhotoDrop}
                 onTextEdit={handleTextEdit}
+                onFrameToolDeactivate={handleFrameToolDeactivate}
               />
 
               <PageStrip

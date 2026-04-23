@@ -152,6 +152,35 @@ export function restoreEmptyFrame(
   canvas.add(rect)
 }
 
+// ─── 1c. createFrameAtPx ────────────────────────────────────────────────────
+// Creates a user-drawn frame at explicit pixel coords and returns it.
+
+export function createFrameAtPx(
+  canvas: fabric.Canvas,
+  x: number, y: number, w: number, h: number,
+): fabric.Rect {
+  const rect = new fabric.Rect({
+    left:   x,
+    top:    y,
+    width:  w,
+    height: h,
+    originX: 'left',
+    originY: 'top',
+    fill:         '#F0EFEB',
+    stroke:       '#528ED6',
+    strokeWidth:  1,
+    strokeDashArray: [5, 5],
+    strokeUniform:   true,
+    selectable:    true,
+    evented:       true,
+    lockRotation:  true,
+  }) as fabric.Rect & { data: FrameData }
+
+  rect.data = { type: 'frame', isEmpty: true, frameX: x, frameY: y, frameW: w, frameH: h }
+  canvas.add(rect)
+  return rect
+}
+
 // ─── 2. applyLayout ─────────────────────────────────────────────────────────
 
 export function applyLayout(

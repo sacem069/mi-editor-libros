@@ -32,6 +32,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 36px 32px;
+  justify-items: center;
 }
 
 /* ─── Card ───────────────────────────────────────────────────────────────────── */
@@ -84,9 +85,10 @@
   user-select: none;
 }
 
-/* Spread pages container — two pages side by side, landscape proportions */
+/* Spread pages container — explicit height gives the card a natural width via aspect-ratio */
 .spreads-card-pages {
   display: flex;
+  height: 90px;
   border: 1px solid #c4c4c4;
   border-radius: 1px;
   overflow: hidden;
@@ -104,18 +106,20 @@
   transition: none;
 }
 
-/* Each page: portrait aspect ratio 816:1058 ≈ 77:100 */
+/* Each page: height fills the container; width flows from the portrait aspect ratio */
 .spreads-card-page {
-  flex: 1;
-  min-width: 0;
+  flex: none;
   display: block;
+  height: 100%;
+  width: auto;
   aspect-ratio: 816 / 1058;
   object-fit: cover;
 }
 
 .spreads-card-page--blank {
-  flex: 1;
-  min-width: 0;
+  flex: none;
+  height: 100%;
+  width: auto;
   aspect-ratio: 816 / 1058;
   background: #ffffff;
 }
