@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
-import { X, AlignLeft, AlignCenterHorizontal, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround } from 'lucide-react'
+import { X, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignVerticalJustifyStart, AlignCenterHorizontal, AlignVerticalJustifyEnd, AlignVerticalSpaceAround, AlignHorizontalSpaceAround } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
 import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
@@ -28,7 +28,11 @@ const MAX_HISTORY = 20
 
 interface CanvasProps {
   zoom: number
-  showBleed: boolean
+  showGrid: boolean
+  gridSettings: GridSettings
+  rulerMode: boolean
+  guides: Guide[]
+  onGuidesChange: (guides: Guide[]) => void
   currentSpread: number
   totalSpreads: number
   viewMode: 'editor' | 'spreads'
@@ -57,6 +61,201 @@ function spreadLabel(spread: number, totalSpreads: number, back: string, cover: 
   return { left: String(leftNum).padStart(2, '0'), right: String(rightNum).padStart(2, '0') }
 }
 
+export interface GridSettings {
+  cols: number
+  rows: number
+  color: string
+  opacity: number
+  thickness: 'thin' | 'normal'
+}
+
+function GridOverlay({ settings }: { settings: GridSettings }) {
+  const { cols, rows, color, opacity, thickness } = settings
+  const sw  = thickness === 'thin' ? 0.6 : 1.2
+  const gap = 2.5
+  const vLines = Array.from({ length: cols - 1 }, (_, i) => (PAGE_W / cols) * (i + 1))
+  const hLines = Array.from({ length: rows - 1 }, (_, i) => (PAGE_H / rows) * (i + 1))
+  return (
+    <svg
+      style={{ position: 'absolute', top: 0, left: 0, width: PAGE_W, height: PAGE_H, pointerEvents: 'none', opacity: opacity / 100 }}
+      viewBox={`0 0 ${PAGE_W} ${PAGE_H}`}
+      aria-hidden="true"
+    >
+      {vLines.map((x) => (
+        <g key={x}>
+          <line x1={x - gap / 2} y1={0} x2={x - gap / 2} y2={PAGE_H} stroke={color} strokeWidth={sw} />
+          <line x1={x + gap / 2} y1={0} x2={x + gap / 2} y2={PAGE_H} stroke={color} strokeWidth={sw} />
+        </g>
+      ))}
+      {hLines.map((y) => (
+        <g key={y}>
+          <line x1={0} y1={y - gap / 2} x2={PAGE_W} y2={y - gap / 2} stroke={color} strokeWidth={sw} />
+          <line x1={0} y1={y + gap / 2} x2={PAGE_W} y2={y + gap / 2} stroke={color} strokeWidth={sw} />
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+export interface Guide { id: string; type: 'h' | 'v'; pos: number }
+
+const R = 18  // ruler bar thickness in page pixels
+let _gseq = 0
+
+type DragState =
+  | { mode: 'create-h' | 'create-v'; pos: number }
+  | { mode: 'move'; id: string; guideType: 'h' | 'v'; pos: number; startPos: number }
+
+function RulerAndGuides({
+  pageW, pageH, zoom, guides, onGuidesChange, pageWrapRef,
+}: {
+  pageW: number; pageH: number; zoom: number
+  guides: Guide[]; onGuidesChange: (g: Guide[]) => void
+  pageWrapRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const zoomRef   = useRef(zoom);            zoomRef.current = zoom
+  const guidesRef = useRef(guides);          guidesRef.current = guides
+  const changeRef = useRef(onGuidesChange);  changeRef.current = onGuidesChange
+  const dragRef   = useRef<DragState | null>(null)
+  const [, tick]  = useState(0)
+  const redraw    = () => tick(n => n + 1)
+
+  // Convert screen coords → page-pixel coords (0..pageW, 0..pageH)
+  const toPage = (cx: number, cy: number) => {
+    const r = pageWrapRef.current?.getBoundingClientRect()
+    if (!r) return { x: 0, y: 0 }
+    return { x: (cx - r.left) / zoomRef.current, y: (cy - r.top) / zoomRef.current }
+  }
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current; if (!d) return
+      const { x, y } = toPage(e.clientX, e.clientY)
+      if (d.mode === 'move') {
+        dragRef.current = { ...d, pos: d.guideType === 'h' ? y : x }
+      } else {
+        dragRef.current = { mode: d.mode, pos: d.mode === 'create-h' ? y : x }
+      }
+      redraw()
+    }
+    const onUp = (e: MouseEvent) => {
+      const d = dragRef.current; if (!d) return
+      const { x, y } = toPage(e.clientX, e.clientY)
+      dragRef.current = null; redraw()
+      if (d.mode === 'create-h') {
+        if (y >= 0 && y <= pageH)
+          changeRef.current([...guidesRef.current, { id: `g${++_gseq}`, type: 'h', pos: y }])
+      } else if (d.mode === 'create-v') {
+        if (x >= 0 && x <= pageW)
+          changeRef.current([...guidesRef.current, { id: `g${++_gseq}`, type: 'v', pos: x }])
+      } else if (d.mode === 'move') {
+        const isH      = d.guideType === 'h'
+        const finalPos = isH ? y : x
+        const clicked  = Math.abs(finalPos - d.startPos) < 4   // treat as click → delete
+        const offPage  = isH ? (y < 0 || y > pageH) : (x < 0 || x > pageW)
+        if (clicked || offPage) {
+          changeRef.current(guidesRef.current.filter(g => g.id !== d.id))
+        } else {
+          changeRef.current(guidesRef.current.map(g => g.id === d.id ? { ...g, pos: finalPos } : g))
+        }
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+  }, [pageW, pageH])
+
+  const drag          = dragRef.current
+  const displayGuides = drag?.mode === 'move' ? guides.filter(g => g.id !== drag.id) : guides
+  const preview = drag ? {
+    type: drag.mode === 'move' ? drag.guideType : drag.mode === 'create-h' ? 'h' as const : 'v' as const,
+    pos:  drag.pos,
+  } : null
+
+  // SVG is larger than the page and positioned outside it:
+  // SVG top-left = (-R, -R) relative to page-wrap → ruler bars live in the R-pixel strip around the page
+  // In SVG coordinates: page top-left = (R, R), guide at page-pos p → SVG-pos p+R
+  const W = pageW + R
+  const H = pageH + R
+  const CM = 37.8
+  const hTx = Array.from({ length: Math.ceil(pageW / CM) + 1 }, (_, i) => i)
+  const vTx = Array.from({ length: Math.ceil(pageH / CM) + 1 }, (_, i) => i)
+
+  const gx1 = (g: Guide) => g.type === 'v' ? g.pos + R : 0
+  const gy1 = (g: Guide) => g.type === 'h' ? g.pos + R : 0
+  const gx2 = (g: Guide) => g.type === 'v' ? g.pos + R : W
+  const gy2 = (g: Guide) => g.type === 'h' ? g.pos + R : H
+
+  return (
+    <svg className="canvas-ruler-overlay"
+      style={{ top: -R, left: -R, width: W, height: H }}
+      viewBox={`0 0 ${W} ${H}`}
+      aria-hidden="true"
+    >
+      {/* ── guide lines ─────────────────────────────────────── */}
+      {displayGuides.map(g => (
+        <g key={g.id} style={{ cursor: 'crosshair' }}
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation()
+            dragRef.current = { mode: 'move', id: g.id, guideType: g.type, pos: g.pos, startPos: g.pos }; redraw() }}
+        >
+          <line x1={gx1(g)} y1={gy1(g)} x2={gx2(g)} y2={gy2(g)}
+            stroke="transparent" strokeWidth={10} style={{ pointerEvents: 'stroke' }} />
+          <line x1={gx1(g)} y1={gy1(g)} x2={gx2(g)} y2={gy2(g)}
+            stroke="#00C073" strokeWidth={0.8} style={{ pointerEvents: 'none' }} />
+        </g>
+      ))}
+      {preview && (() => {
+        const px = preview.type === 'v' ? preview.pos + R : 0
+        const py = preview.type === 'h' ? preview.pos + R : 0
+        const px2 = preview.type === 'v' ? preview.pos + R : W
+        const py2 = preview.type === 'h' ? preview.pos + R : H
+        return <line x1={px} y1={py} x2={px2} y2={py2}
+          stroke="#00C073" strokeWidth={0.8} strokeDasharray="5 3" style={{ pointerEvents: 'none' }} />
+      })()}
+
+      {/* ── top ruler ───────────────────────────────────────── */}
+      <g style={{ cursor: 's-resize' }}
+        onMouseDown={e => { e.preventDefault(); e.stopPropagation()
+          dragRef.current = { mode: 'create-h', pos: 0 }; redraw() }}
+      >
+        <rect x={R} y={0} width={pageW} height={R} fill="#F0F0F0" style={{ pointerEvents: 'all' }} />
+        <line x1={R} y1={R} x2={W} y2={R} stroke="#C0C0C0" strokeWidth={0.5} style={{ pointerEvents: 'none' }} />
+        {hTx.map(i => {
+          const x = R + i * CM; if (x > W) return null
+          return <g key={i} style={{ pointerEvents: 'none' }}>
+            <line x1={x} y1={R - 7} x2={x} y2={R} stroke="#999" strokeWidth={0.5} />
+            {i > 0 && <text x={x + 1.5} y={R - 8} fontSize={5} fill="#777" fontFamily="Arial,sans-serif">{i}</text>}
+            {x + CM / 2 <= W && <line x1={x + CM/2} y1={R - 4} x2={x + CM/2} y2={R} stroke="#C0C0C0" strokeWidth={0.4} />}
+          </g>
+        })}
+      </g>
+
+      {/* ── left ruler ──────────────────────────────────────── */}
+      <g style={{ cursor: 'e-resize' }}
+        onMouseDown={e => { e.preventDefault(); e.stopPropagation()
+          dragRef.current = { mode: 'create-v', pos: 0 }; redraw() }}
+      >
+        <rect x={0} y={R} width={R} height={pageH} fill="#F0F0F0" style={{ pointerEvents: 'all' }} />
+        <line x1={R} y1={R} x2={R} y2={H} stroke="#C0C0C0" strokeWidth={0.5} style={{ pointerEvents: 'none' }} />
+        {vTx.map(i => {
+          const y = R + i * CM; if (y > H) return null
+          return <g key={i} style={{ pointerEvents: 'none' }}>
+            <line x1={R - 7} y1={y} x2={R} y2={y} stroke="#999" strokeWidth={0.5} />
+            {i > 0 && <text x={R - 9} y={y - 1} fontSize={5} fill="#777" fontFamily="Arial,sans-serif" textAnchor="end">{i}</text>}
+            {y + CM / 2 <= H && <line x1={R - 4} y1={y + CM/2} x2={R} y2={y + CM/2} stroke="#C0C0C0" strokeWidth={0.4} />}
+          </g>
+        })}
+      </g>
+
+      {/* ── corner square ───────────────────────────────────── */}
+      <rect x={0} y={0} width={R} height={R} fill="#E4E4E4" style={{ pointerEvents: 'none' }} />
+    </svg>
+  )
+}
+
 function BleedOverlay() {
   return (
     <svg
@@ -81,7 +280,11 @@ function BleedOverlay() {
 
 export default function Canvas({
   zoom,
-  showBleed,
+  showGrid,
+  gridSettings,
+  rulerMode,
+  guides,
+  onGuidesChange,
   currentSpread,
   totalSpreads,
   viewMode,
@@ -105,6 +308,8 @@ export default function Canvas({
   const innerRef        = useRef<HTMLDivElement>(null)
   const spreadRootRef   = useRef<HTMLDivElement>(null)
   const scaleAnchorRef  = useRef<HTMLDivElement>(null)
+  const leftPageWrapRef  = useRef<HTMLDivElement>(null)
+  const rightPageWrapRef = useRef<HTMLDivElement>(null)
   const badgeTextRef    = useRef<HTMLSpanElement>(null)
   const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -289,7 +494,7 @@ export default function Canvas({
   }, [applyZoom])
 
   // ── Multi-selection alignment ──────────────────────────────────────────────
-  type AlignType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' | 'dist-h' | 'dist-v'
+  type AlignType = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' | 'dist-v' | 'dist-h'
   const applyAlignment = useCallback((type: AlignType) => {
     if (!multiSel) return
     const fc = multiSel.side === 'left' ? leftFabric.current : rightFabric.current
@@ -323,27 +528,31 @@ export default function Canvas({
         case 'bottom':
           obj.set({ top: (obj.top ?? 0) + (selBR.bottom - (br.top + br.height)) }); break
       }
-      if (type !== 'dist-h' && type !== 'dist-v') obj.setCoords()
+      if (type !== 'dist-v' && type !== 'dist-h') obj.setCoords()
     })
 
     if (type === 'dist-h') {
-      const sorted = [...items].sort((a, b) => (a.br.left + a.br.width / 2) - (b.br.left + b.br.width / 2))
-      const firstCX = sorted[0].br.left + sorted[0].br.width / 2
-      const lastCX  = sorted.at(-1)!.br.left + sorted.at(-1)!.br.width / 2
-      const gap     = (lastCX - firstCX) / (sorted.length - 1)
-      sorted.forEach(({ obj, br }, i) => {
-        obj.set({ left: (obj.left ?? 0) + (firstCX + i * gap - (br.left + br.width / 2)) })
+      const sorted    = [...items].sort((a, b) => a.br.left - b.br.left)
+      const totalW    = sorted.reduce((s, it) => s + it.br.width, 0)
+      const totalSpan = sorted.at(-1)!.br.left + sorted.at(-1)!.br.width - sorted[0].br.left
+      const gap       = (totalSpan - totalW) / (sorted.length - 1)
+      let cursor      = sorted[0].br.left
+      sorted.forEach(({ obj, br }) => {
+        obj.set({ left: (obj.left ?? 0) + (cursor - br.left) })
         obj.setCoords()
+        cursor += br.width + gap
       })
     }
     if (type === 'dist-v') {
-      const sorted = [...items].sort((a, b) => (a.br.top + a.br.height / 2) - (b.br.top + b.br.height / 2))
-      const firstCY = sorted[0].br.top + sorted[0].br.height / 2
-      const lastCY  = sorted.at(-1)!.br.top + sorted.at(-1)!.br.height / 2
-      const gap     = (lastCY - firstCY) / (sorted.length - 1)
-      sorted.forEach(({ obj, br }, i) => {
-        obj.set({ top: (obj.top ?? 0) + (firstCY + i * gap - (br.top + br.height / 2)) })
+      const sorted    = [...items].sort((a, b) => a.br.top - b.br.top)
+      const totalH    = sorted.reduce((s, it) => s + it.br.height, 0)
+      const totalSpan = sorted.at(-1)!.br.top + sorted.at(-1)!.br.height - sorted[0].br.top
+      const gap       = (totalSpan - totalH) / (sorted.length - 1)
+      let cursor      = sorted[0].br.top
+      sorted.forEach(({ obj, br }) => {
+        obj.set({ top: (obj.top ?? 0) + (cursor - br.top) })
         obj.setCoords()
+        cursor += br.height + gap
       })
     }
 
@@ -1083,6 +1292,7 @@ export default function Canvas({
               <div className="canvas-page-col">
                 <div className="canvas-page-num">{leftLabel}</div>
                 <div
+                  ref={leftPageWrapRef}
                   className={[
                     'canvas-page-wrap',
                     activePage   === 'left' ? 'canvas-page-wrap--active'    : '',
@@ -1093,7 +1303,9 @@ export default function Canvas({
                   onDragLeave={handleDragLeave}
                 >
                   <canvas ref={leftElRef} />
-                  {showBleed && <BleedOverlay />}
+                  <BleedOverlay />
+                  {showGrid && <GridOverlay settings={gridSettings} />}
+                  {rulerMode && <RulerAndGuides pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={leftPageWrapRef} />}
                   {isLastSpread && (
                     <div className="canvas-logo-overlay" aria-hidden="true">
                       <img src="/LogoZeika.jpg" alt="Zeika Memories" className="canvas-logo-img" />
@@ -1121,16 +1333,16 @@ export default function Canvas({
                   )}
                   {multiSel?.side === 'left' && (
                     <div className="canvas-align-toolbar" style={{ top: multiSel.selBottom + 8, left: multiSel.selLeft + multiSel.selWidth / 2 }}>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}         aria-label="Alinear izquierda"><AlignLeft size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}    aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}        aria-label="Alinear derecha"><AlignRight size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}      aria-label="Alinear izquierda"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}  aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}     aria-label="Alinear derecha"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
                       <div className="canvas-align-sep" />
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}          aria-label="Alinear arriba"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}    aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}       aria-label="Alinear abajo"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}       aria-label="Alinear arriba"><AlignVerticalJustifyStart size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}  aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}    aria-label="Alinear abajo"><AlignVerticalJustifyEnd size={18} strokeWidth={1.5} /></button>
                       <div className="canvas-align-sep" />
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}      aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}      aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}   aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}   aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
                     </div>
                   )}
                 </div>
@@ -1142,6 +1354,7 @@ export default function Canvas({
               <div className="canvas-page-col">
                 <div className="canvas-page-num canvas-page-num--right">{rightLabel}</div>
                 <div
+                  ref={rightPageWrapRef}
                   className={[
                     'canvas-page-wrap',
                     activePage   === 'right' ? 'canvas-page-wrap--active'    : '',
@@ -1152,7 +1365,9 @@ export default function Canvas({
                   onDragLeave={handleDragLeave}
                 >
                   <canvas ref={rightElRef} />
-                  {showBleed && <BleedOverlay />}
+                  <BleedOverlay />
+                  {showGrid && <GridOverlay settings={gridSettings} />}
+                  {rulerMode && <RulerAndGuides pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={rightPageWrapRef} />}
                   {isLastSpread && (
                     <div className="canvas-no-edit-overlay" aria-hidden="true">
                       <span className="canvas-no-edit-label">No editable</span>
@@ -1175,16 +1390,16 @@ export default function Canvas({
                   )}
                   {multiSel?.side === 'right' && (
                     <div className="canvas-align-toolbar" style={{ top: multiSel.selBottom + 8, left: multiSel.selLeft + multiSel.selWidth / 2 }}>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}         aria-label="Alinear izquierda"><AlignLeft size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}    aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}        aria-label="Alinear derecha"><AlignRight size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('left')}      aria-label="Alinear izquierda"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-h')}  aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('right')}     aria-label="Alinear derecha"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
                       <div className="canvas-align-sep" />
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}          aria-label="Alinear arriba"><AlignStartVertical size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}    aria-label="Centrar vertical"><AlignCenterVertical size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}       aria-label="Alinear abajo"><AlignEndVertical size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('top')}       aria-label="Alinear arriba"><AlignVerticalJustifyStart size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('center-v')}  aria-label="Centrar horizontal"><AlignCenterHorizontal size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('bottom')}    aria-label="Alinear abajo"><AlignVerticalJustifyEnd size={18} strokeWidth={1.5} /></button>
                       <div className="canvas-align-sep" />
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}      aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
-                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}      aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-v')}   aria-label="Distribuir vertical"><AlignVerticalSpaceAround size={18} strokeWidth={1.5} /></button>
+                      <button className="canvas-align-btn" onClick={() => applyAlignment('dist-h')}   aria-label="Distribuir horizontal"><AlignHorizontalSpaceAround size={18} strokeWidth={1.5} /></button>
                     </div>
                   )}
                 </div>

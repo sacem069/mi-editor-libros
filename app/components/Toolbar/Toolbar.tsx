@@ -1,51 +1,64 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler, Hand, PaintBucket, Pipette } from 'lucide-react'
+import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler, Hand, PaintBucket, Pipette, Grid } from 'lucide-react'
 import { useLang } from '../../context/LanguageContext'
+import type { GridSettings } from '../Canvas/Canvas'
 import './Toolbar.css'
 
 interface ToolbarProps {
   canUndo: boolean
   canRedo: boolean
-  showBleed: boolean
+  rulerMode: boolean
   panMode: boolean
   frameTool: boolean
   viewMode: 'editor' | 'spreads'
   pageBackground: string
+  showGrid: boolean
+  gridSettings: GridSettings
   onUndo: () => void
   onRedo: () => void
-  onToggleBleed: () => void
+  onToggleRuler: () => void
   onAddText: () => void
   onPanModeToggle: () => void
   onFrameToolToggle: () => void
   onViewModeChange: (mode: 'editor' | 'spreads') => void
   onPageBgChange: (color: string) => void
   onApplyBgToAll: () => void
+  onToggleGrid: () => void
+  onGridSettingsChange: (s: GridSettings) => void
 }
 
 export default function Toolbar({
   canUndo,
   canRedo,
-  showBleed,
+  rulerMode,
   panMode,
   frameTool,
   viewMode,
   pageBackground,
+  showGrid,
+  gridSettings,
   onUndo,
   onRedo,
-  onToggleBleed,
+  onToggleRuler,
   onAddText,
   onPanModeToggle,
   onFrameToolToggle,
   onViewModeChange,
   onPageBgChange,
   onApplyBgToAll,
+  onToggleGrid,
+  onGridSettingsChange,
 }: ToolbarProps) {
   const { t } = useLang()
   const [paintOpen, setPaintOpen] = useState(false)
   const paintWrapRef  = useRef<HTMLDivElement>(null)
   const colorInputRef = useRef<HTMLInputElement>(null)
+
+  const [gridOpen, setGridOpen]     = useState(false)
+  const gridWrapRef                 = useRef<HTMLDivElement>(null)
+  const gridColorRef                = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!paintOpen) return
@@ -57,6 +70,17 @@ export default function Toolbar({
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [paintOpen])
+
+  useEffect(() => {
+    if (!gridOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (gridWrapRef.current && !gridWrapRef.current.contains(e.target as Node)) {
+        setGridOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [gridOpen])
 
   const handleEyedropper = async () => {
     type EyeDropperAPI = { open: () => Promise<{ sRGBHex: string }> }
@@ -121,12 +145,12 @@ export default function Toolbar({
         </button>
 
         <button
-          className={`toolbar-btn${showBleed ? ' toolbar-btn--active' : ''}`}
-          onClick={onToggleBleed}
-          aria-label={t.guides}
+          className={`toolbar-btn${rulerMode ? ' toolbar-btn--active' : ''}`}
+          onClick={onToggleRuler}
+          aria-label="Regla"
         >
           <Ruler size={22} strokeWidth={1.5} />
-          <span className="toolbar-tooltip">{t.guides}</span>
+          <span className="toolbar-tooltip">Regla</span>
         </button>
 
         <button
@@ -137,6 +161,86 @@ export default function Toolbar({
           <Hand size={22} strokeWidth={1.5} />
           <span className="toolbar-tooltip">Mano</span>
         </button>
+
+        {/* Grid */}
+        <div className="toolbar-grid-wrap" ref={gridWrapRef}>
+          <button
+            className={`toolbar-btn${showGrid ? ' toolbar-btn--active' : ''}`}
+            onClick={() => {
+              if (!showGrid) { onToggleGrid(); setGridOpen(true) }
+              else if (gridOpen) { setGridOpen(false) }
+              else { onToggleGrid() }
+            }}
+            aria-label="Cuadrícula"
+          >
+            <Grid size={22} strokeWidth={1.5} />
+            <span className="toolbar-tooltip">Cuadrícula</span>
+          </button>
+
+          {gridOpen && (
+            <div className="toolbar-grid-popover">
+              <div className="toolbar-grid-row">
+                <label className="toolbar-grid-label">Columnas</label>
+                <input
+                  className="toolbar-grid-number"
+                  type="number" min={1} max={50}
+                  value={gridSettings.cols}
+                  onChange={(e) => onGridSettingsChange({ ...gridSettings, cols: Math.max(1, parseInt(e.target.value) || 1) })}
+                />
+              </div>
+              <div className="toolbar-grid-row">
+                <label className="toolbar-grid-label">Filas</label>
+                <input
+                  className="toolbar-grid-number"
+                  type="number" min={1} max={50}
+                  value={gridSettings.rows}
+                  onChange={(e) => onGridSettingsChange({ ...gridSettings, rows: Math.max(1, parseInt(e.target.value) || 1) })}
+                />
+              </div>
+              <div className="toolbar-grid-row">
+                <label className="toolbar-grid-label">Color</label>
+                <button
+                  className="toolbar-paint-swatch toolbar-grid-swatch"
+                  style={{ background: gridSettings.color }}
+                  onClick={() => gridColorRef.current?.click()}
+                  aria-label="Elegir color"
+                />
+                <input
+                  ref={gridColorRef}
+                  type="color"
+                  value={gridSettings.color}
+                  onChange={(e) => onGridSettingsChange({ ...gridSettings, color: e.target.value })}
+                  className="toolbar-paint-input"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
+              </div>
+              <div className="toolbar-grid-row toolbar-grid-row--slider">
+                <label className="toolbar-grid-label">Opacidad</label>
+                <input
+                  className="toolbar-grid-slider"
+                  type="range" min={0} max={100}
+                  value={gridSettings.opacity}
+                  onChange={(e) => onGridSettingsChange({ ...gridSettings, opacity: parseInt(e.target.value) })}
+                />
+                <span className="toolbar-grid-pct">{gridSettings.opacity}%</span>
+              </div>
+              <div className="toolbar-grid-row toolbar-grid-row--thickness">
+                <label className="toolbar-grid-label">Grosor</label>
+                <div className="toolbar-grid-toggle">
+                  <button
+                    className={`toolbar-grid-toggle-btn${gridSettings.thickness === 'thin' ? ' toolbar-grid-toggle-btn--active' : ''}`}
+                    onClick={() => onGridSettingsChange({ ...gridSettings, thickness: 'thin' })}
+                  >Fina</button>
+                  <button
+                    className={`toolbar-grid-toggle-btn${gridSettings.thickness === 'normal' ? ' toolbar-grid-toggle-btn--active' : ''}`}
+                    onClick={() => onGridSettingsChange({ ...gridSettings, thickness: 'normal' })}
+                  >Normal</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Paint bucket */}
         <div className="toolbar-paint-wrap" ref={paintWrapRef}>

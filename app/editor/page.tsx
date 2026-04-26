@@ -21,6 +21,7 @@ import PageStrip   from '../components/PageStrip/PageStrip'
 import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 
 import { BOOK_SIZE }                                      from '../config/bookSize'
+import type { GridSettings, Guide }                        from '../components/Canvas/Canvas'
 import { applyLayout, addTextBox, serializePage,
          deserializePage, dropPhotoOnFrame,
          exportPageAsJpg, buildPageFromLayout }            from '../components/Canvas/fabricHelpers'
@@ -74,10 +75,15 @@ export default function EditorPage() {
 
   // ── Canvas settings ────────────────────────────────────────────────────────
   const [zoom,           setZoom]           = useState(0.75) // overridden by Canvas on mount
-  const [showBleed,      setShowBleed]      = useState(false)
+  const [rulerMode,      setRulerMode]      = useState(false)
+  const [guides,         setGuides]         = useState<Guide[]>([])
   const [panMode,        setPanMode]        = useState(false)
   const [frameTool,      setFrameTool]      = useState(false)
   const [activePageBg,   setActivePageBg]   = useState('#FFFFFF')
+  const [showGrid,       setShowGrid]       = useState(false)
+  const [gridSettings,   setGridSettings]   = useState<GridSettings>({
+    cols: 5, rows: 5, color: '#ff0000', opacity: 20, thickness: 'thin',
+  })
 
   // ── History (undo / redo) ──────────────────────────────────────────────────
   const [canUndo, setCanUndo] = useState(false)
@@ -673,8 +679,13 @@ export default function EditorPage() {
   // ── Zoom ───────────────────────────────────────────────────────────────────
   const handleZoomChange = useCallback((z: number) => setZoom(z), [])
 
-  // ── Bleed ──────────────────────────────────────────────────────────────────
-  const handleToggleBleed = useCallback(() => setShowBleed((v) => !v), [])
+  // ── Ruler ──────────────────────────────────────────────────────────────────
+  const handleToggleRuler  = useCallback(() => setRulerMode((v) => !v), [])
+  const handleGuidesChange = useCallback((g: Guide[]) => setGuides(g), [])
+
+  // ── Grid ───────────────────────────────────────────────────────────────────
+  const handleToggleGrid         = useCallback(() => setShowGrid((v) => !v), [])
+  const handleGridSettingsChange = useCallback((s: GridSettings) => setGridSettings(s), [])
 
   // ── Viewport pan mode ─────────────────────────────────────────────────────
   const handlePanModeToggle = useCallback(() => {
@@ -894,20 +905,24 @@ export default function EditorPage() {
           <Toolbar
             canUndo={canUndo}
             canRedo={canRedo}
-            showBleed={showBleed}
+            rulerMode={rulerMode}
             panMode={panMode}
             frameTool={frameTool}
             viewMode={viewMode}
             pageBackground={activePageBg}
+            showGrid={showGrid}
+            gridSettings={gridSettings}
             onUndo={handleUndo}
             onRedo={handleRedo}
-            onToggleBleed={handleToggleBleed}
+            onToggleRuler={handleToggleRuler}
             onAddText={handleAddText}
             onPanModeToggle={handlePanModeToggle}
             onFrameToolToggle={handleFrameToolToggle}
             onViewModeChange={handleViewModeChange}
             onPageBgChange={handlePageBgChange}
             onApplyBgToAll={handleApplyBgToAll}
+            onToggleGrid={handleToggleGrid}
+            onGridSettingsChange={handleGridSettingsChange}
           />
 
           {viewMode === 'spreads' ? (
@@ -922,7 +937,11 @@ export default function EditorPage() {
             <>
               <Canvas
                 zoom={zoom}
-                showBleed={showBleed}
+                showGrid={showGrid}
+                rulerMode={rulerMode}
+                guides={guides}
+                onGuidesChange={handleGuidesChange}
+                gridSettings={gridSettings}
                 currentSpread={currentSpread}
                 totalSpreads={totalSpreads}
                 viewMode={viewMode}

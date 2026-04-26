@@ -166,6 +166,125 @@
   border-color: #999;
 }
 
+/* ── Grid ────────────────────────────────────────────────────────────────── */
+
+.toolbar-grid-wrap {
+  position: relative;
+}
+
+.toolbar-grid-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-white);
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  z-index: 200;
+  min-width: 180px;
+  white-space: nowrap;
+}
+
+.toolbar-grid-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-grid-row--slider {
+  gap: 6px;
+}
+
+.toolbar-grid-row--thickness {
+  gap: 8px;
+}
+
+.toolbar-grid-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-black);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.toolbar-grid-number {
+  width: 52px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  padding: 3px 5px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--color-black);
+  background: var(--color-white);
+  text-align: center;
+}
+
+.toolbar-grid-number:focus {
+  outline: none;
+  border-color: var(--color-blue);
+}
+
+.toolbar-grid-swatch {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toolbar-grid-slider {
+  flex: 1;
+  accent-color: var(--color-blue);
+  height: 3px;
+  cursor: pointer;
+}
+
+.toolbar-grid-pct {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: #666;
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.toolbar-grid-toggle {
+  display: flex;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.toolbar-grid-toggle-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-black);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.toolbar-grid-toggle-btn + .toolbar-grid-toggle-btn {
+  border-left: 1px solid #d0d0d0;
+}
+
+.toolbar-grid-toggle-btn--active {
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+
+.toolbar-grid-toggle-btn:not(.toolbar-grid-toggle-btn--active):hover {
+  background: var(--color-cream);
+}
+
 /* ── View toggle ─────────────────────────────────────────────────────────── */
 
 .toolbar-view-toggle {
