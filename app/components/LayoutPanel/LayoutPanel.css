@@ -9,38 +9,100 @@
   overflow: hidden;
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
+/* ── Main tab bar ─────────────────────────────────────────────────────────── */
 
-.layout-panel-header {
+.panel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid #b0b0b0;
+}
+
+.panel-tab {
+  flex: 1;
+  height: 37px;
+  background: #d9d9d9;
+  border: none;
+  border-right: 1px solid #b0b0b0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+  letter-spacing: 0.02em;
+}
+
+.panel-tab:last-child {
+  border-right: none;
+}
+
+.panel-tab--active {
+  background: var(--color-white);
+  color: var(--color-black);
+  font-weight: 500;
+  /* paint a white 1px line over the container's border-bottom */
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 1px 0 0 var(--color-white);
+}
+
+.panel-tab:hover:not(.panel-tab--active) {
+  color: var(--color-black);
+  background: #cecece;
+}
+
+/* ── Sub-tabs ─────────────────────────────────────────────────────────────── */
+
+.panel-subtabs {
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid #EBEBEB;
+  margin-bottom: 8px;
+}
+
+.panel-subtab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 0 6px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-black);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  letter-spacing: 0.02em;
+}
+
+.panel-subtab--active {
+  color: var(--color-blue);
+  font-weight: 500;
+  border-bottom-color: var(--color-blue);
+}
+
+.panel-subtab:hover:not(.panel-subtab--active) {
+  color: #555;
+}
+
+/* ── Content grid (Fondos / Deco) ─────────────────────────────────────────── */
+
+.panel-content-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  align-items: left;
-  gap: 10px;
-  flex-shrink: 0;
-  text-align: left;
-  border-bottom: 1px solid rgb(207, 207, 207);
-  /* padding: 2.5px 15px 2.5px; */
-  padding-top: 2px;
-  padding-bottom: 0px;
-  padding-left: 10px;
-   margin-top: 3px;
-  margin-bottom: 15px;
 }
 
-.layout-panel-title {
+.panel-empty {
   font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-black);
+  font-size: 11px;
+  color: #bbb;
+  text-align: center;
+  margin-top: 32px;
 }
-
-/* 
-.layout-panel-bar {
-  width: 167px;
-  height: 3px;
-  background: var(--color-blue);
-  border-radius: 2px;
-} */
 
 /* ── Photo count selector ────────────────────────────────────────────────── */
 

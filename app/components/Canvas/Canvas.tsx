@@ -72,7 +72,7 @@ export interface GridSettings {
 function GridOverlay({ settings }: { settings: GridSettings }) {
   const { cols, rows, color, opacity, thickness } = settings
   const sw  = thickness === 'thin' ? 0.6 : 1.2
-  const gap = 2.5
+  const gap = 5
   const vLines = Array.from({ length: cols - 1 }, (_, i) => (PAGE_W / cols) * (i + 1))
   const hLines = Array.from({ length: rows - 1 }, (_, i) => (PAGE_H / rows) * (i + 1))
   return (
@@ -99,14 +99,16 @@ function GridOverlay({ settings }: { settings: GridSettings }) {
 
 export interface Guide { id: string; type: 'h' | 'v'; pos: number }
 
-const R = 18  // ruler bar thickness in page pixels
+const CM_PX     = 37.8
+const RULER_SIZE = 22
 let _gseq = 0
 
 type DragState =
   | { mode: 'create-h' | 'create-v'; pos: number }
   | { mode: 'move'; id: string; guideType: 'h' | 'v'; pos: number; startPos: number }
 
-function RulerAndGuides({
+// Guide lines only — no ruler bars
+function GuidesOverlay({
   pageW, pageH, zoom, guides, onGuidesChange, pageWrapRef,
 }: {
   pageW: number; pageH: number; zoom: number
@@ -120,7 +122,6 @@ function RulerAndGuides({
   const [, tick]  = useState(0)
   const redraw    = () => tick(n => n + 1)
 
-  // Convert screen coords → page-pixel coords (0..pageW, 0..pageH)
   const toPage = (cx: number, cy: number) => {
     const r = pageWrapRef.current?.getBoundingClientRect()
     if (!r) return { x: 0, y: 0 }
@@ -142,16 +143,10 @@ function RulerAndGuides({
       const d = dragRef.current; if (!d) return
       const { x, y } = toPage(e.clientX, e.clientY)
       dragRef.current = null; redraw()
-      if (d.mode === 'create-h') {
-        if (y >= 0 && y <= pageH)
-          changeRef.current([...guidesRef.current, { id: `g${++_gseq}`, type: 'h', pos: y }])
-      } else if (d.mode === 'create-v') {
-        if (x >= 0 && x <= pageW)
-          changeRef.current([...guidesRef.current, { id: `g${++_gseq}`, type: 'v', pos: x }])
-      } else if (d.mode === 'move') {
+      if (d.mode === 'move') {
         const isH      = d.guideType === 'h'
         const finalPos = isH ? y : x
-        const clicked  = Math.abs(finalPos - d.startPos) < 4   // treat as click → delete
+        const clicked  = Math.abs(finalPos - d.startPos) < 4
         const offPage  = isH ? (y < 0 || y > pageH) : (x < 0 || x > pageW)
         if (clicked || offPage) {
           changeRef.current(guidesRef.current.filter(g => g.id !== d.id))
@@ -170,89 +165,288 @@ function RulerAndGuides({
 
   const drag          = dragRef.current
   const displayGuides = drag?.mode === 'move' ? guides.filter(g => g.id !== drag.id) : guides
-  const preview = drag ? {
-    type: drag.mode === 'move' ? drag.guideType : drag.mode === 'create-h' ? 'h' as const : 'v' as const,
+  const preview = drag?.mode === 'move' ? {
+    type: drag.guideType,
     pos:  drag.pos,
   } : null
 
-  // SVG is larger than the page and positioned outside it:
-  // SVG top-left = (-R, -R) relative to page-wrap → ruler bars live in the R-pixel strip around the page
-  // In SVG coordinates: page top-left = (R, R), guide at page-pos p → SVG-pos p+R
-  const W = pageW + R
-  const H = pageH + R
-  const CM = 37.8
-  const hTx = Array.from({ length: Math.ceil(pageW / CM) + 1 }, (_, i) => i)
-  const vTx = Array.from({ length: Math.ceil(pageH / CM) + 1 }, (_, i) => i)
-
-  const gx1 = (g: Guide) => g.type === 'v' ? g.pos + R : 0
-  const gy1 = (g: Guide) => g.type === 'h' ? g.pos + R : 0
-  const gx2 = (g: Guide) => g.type === 'v' ? g.pos + R : W
-  const gy2 = (g: Guide) => g.type === 'h' ? g.pos + R : H
-
   return (
-    <svg className="canvas-ruler-overlay"
-      style={{ top: -R, left: -R, width: W, height: H }}
-      viewBox={`0 0 ${W} ${H}`}
+    <svg
+      className="canvas-guides-overlay"
+      style={{ width: pageW, height: pageH }}
+      viewBox={`0 0 ${pageW} ${pageH}`}
       aria-hidden="true"
     >
-      {/* ── guide lines ─────────────────────────────────────── */}
-      {displayGuides.map(g => (
-        <g key={g.id} style={{ cursor: 'crosshair' }}
-          onMouseDown={e => { e.preventDefault(); e.stopPropagation()
-            dragRef.current = { mode: 'move', id: g.id, guideType: g.type, pos: g.pos, startPos: g.pos }; redraw() }}
-        >
-          <line x1={gx1(g)} y1={gy1(g)} x2={gx2(g)} y2={gy2(g)}
-            stroke="transparent" strokeWidth={10} style={{ pointerEvents: 'stroke' }} />
-          <line x1={gx1(g)} y1={gy1(g)} x2={gx2(g)} y2={gy2(g)}
-            stroke="#00C073" strokeWidth={0.8} style={{ pointerEvents: 'none' }} />
-        </g>
-      ))}
+      {displayGuides.map(g => {
+        const x1 = g.type === 'v' ? g.pos : 0
+        const y1 = g.type === 'h' ? g.pos : 0
+        const x2 = g.type === 'v' ? g.pos : pageW
+        const y2 = g.type === 'h' ? g.pos : pageH
+        return (
+          <g key={g.id} style={{ cursor: 'crosshair' }}
+            onMouseDown={e => { e.preventDefault(); e.stopPropagation()
+              dragRef.current = { mode: 'move', id: g.id, guideType: g.type, pos: g.pos, startPos: g.pos }; redraw() }}
+          >
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={10} style={{ pointerEvents: 'stroke' }} />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#00C073" strokeWidth={0.8} style={{ pointerEvents: 'none' }} />
+          </g>
+        )
+      })}
       {preview && (() => {
-        const px = preview.type === 'v' ? preview.pos + R : 0
-        const py = preview.type === 'h' ? preview.pos + R : 0
-        const px2 = preview.type === 'v' ? preview.pos + R : W
-        const py2 = preview.type === 'h' ? preview.pos + R : H
-        return <line x1={px} y1={py} x2={px2} y2={py2}
-          stroke="#00C073" strokeWidth={0.8} strokeDasharray="5 3" style={{ pointerEvents: 'none' }} />
+        const x1 = preview.type === 'v' ? preview.pos : 0
+        const y1 = preview.type === 'h' ? preview.pos : 0
+        const x2 = preview.type === 'v' ? preview.pos : pageW
+        const y2 = preview.type === 'h' ? preview.pos : pageH
+        return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#00C073" strokeWidth={0.8} strokeDasharray="5 3" style={{ pointerEvents: 'none' }} />
       })()}
-
-      {/* ── top ruler ───────────────────────────────────────── */}
-      <g style={{ cursor: 's-resize' }}
-        onMouseDown={e => { e.preventDefault(); e.stopPropagation()
-          dragRef.current = { mode: 'create-h', pos: 0 }; redraw() }}
-      >
-        <rect x={R} y={0} width={pageW} height={R} fill="#F0F0F0" style={{ pointerEvents: 'all' }} />
-        <line x1={R} y1={R} x2={W} y2={R} stroke="#C0C0C0" strokeWidth={0.5} style={{ pointerEvents: 'none' }} />
-        {hTx.map(i => {
-          const x = R + i * CM; if (x > W) return null
-          return <g key={i} style={{ pointerEvents: 'none' }}>
-            <line x1={x} y1={R - 7} x2={x} y2={R} stroke="#999" strokeWidth={0.5} />
-            {i > 0 && <text x={x + 1.5} y={R - 8} fontSize={5} fill="#777" fontFamily="Arial,sans-serif">{i}</text>}
-            {x + CM / 2 <= W && <line x1={x + CM/2} y1={R - 4} x2={x + CM/2} y2={R} stroke="#C0C0C0" strokeWidth={0.4} />}
-          </g>
-        })}
-      </g>
-
-      {/* ── left ruler ──────────────────────────────────────── */}
-      <g style={{ cursor: 'e-resize' }}
-        onMouseDown={e => { e.preventDefault(); e.stopPropagation()
-          dragRef.current = { mode: 'create-v', pos: 0 }; redraw() }}
-      >
-        <rect x={0} y={R} width={R} height={pageH} fill="#F0F0F0" style={{ pointerEvents: 'all' }} />
-        <line x1={R} y1={R} x2={R} y2={H} stroke="#C0C0C0" strokeWidth={0.5} style={{ pointerEvents: 'none' }} />
-        {vTx.map(i => {
-          const y = R + i * CM; if (y > H) return null
-          return <g key={i} style={{ pointerEvents: 'none' }}>
-            <line x1={R - 7} y1={y} x2={R} y2={y} stroke="#999" strokeWidth={0.5} />
-            {i > 0 && <text x={R - 9} y={y - 1} fontSize={5} fill="#777" fontFamily="Arial,sans-serif" textAnchor="end">{i}</text>}
-            {y + CM / 2 <= H && <line x1={R - 4} y1={y + CM/2} x2={R} y2={y + CM/2} stroke="#C0C0C0" strokeWidth={0.4} />}
-          </g>
-        })}
-      </g>
-
-      {/* ── corner square ───────────────────────────────────── */}
-      <rect x={0} y={0} width={R} height={R} fill="#E4E4E4" style={{ pointerEvents: 'none' }} />
     </svg>
+  )
+}
+
+// Viewport-level rulers — sit fixed at top and left edges of canvas-outer
+function ViewportRulers({
+  zoom, innerRef, guides, onGuidesChange,
+}: {
+  zoom: number
+  innerRef: React.RefObject<HTMLDivElement | null>
+  guides: Guide[]
+  onGuidesChange: (guides: Guide[]) => void
+}) {
+  const hRef       = useRef<HTMLCanvasElement>(null)
+  const vRef       = useRef<HTMLCanvasElement>(null)
+  const previewHRef = useRef<HTMLDivElement>(null)
+  const previewVRef = useRef<HTMLDivElement>(null)
+  const zoomRef    = useRef(zoom);    zoomRef.current = zoom
+  const guidesRef  = useRef(guides);  guidesRef.current = guides
+  const changeRef  = useRef(onGuidesChange); changeRef.current = onGuidesChange
+
+  type RulerDrag = { type: 'h' | 'v'; pos: number }
+  const rulerDragRef = useRef<RulerDrag | null>(null)
+
+  // Convert client XY → page pixel coordinates using inner scroll state
+  const toPageCoord = useCallback((clientX: number, clientY: number) => {
+    const inner = innerRef.current
+    if (!inner) return { x: 0, y: 0 }
+    const r = inner.getBoundingClientRect()
+    const z = zoomRef.current
+    return {
+      x: (clientX - r.left + inner.scrollLeft - SCROLL_PAD) / z,
+      y: (clientY - r.top  + inner.scrollTop  - SCROLL_PAD) / z,
+    }
+  }, [innerRef])
+
+  // Move preview lines via direct DOM — no React re-render during drag
+  const showPreview = useCallback((type: 'h' | 'v', pos: number) => {
+    const inner = innerRef.current
+    if (!inner) return
+    const z = zoomRef.current
+    if (type === 'h') {
+      const el = previewHRef.current
+      if (!el) return
+      el.style.top     = (pos * z + SCROLL_PAD - inner.scrollTop + RULER_SIZE) + 'px'
+      el.style.display = 'block'
+    } else {
+      const el = previewVRef.current
+      if (!el) return
+      el.style.left    = (pos * z + SCROLL_PAD - inner.scrollLeft + RULER_SIZE) + 'px'
+      el.style.display = 'block'
+    }
+  }, [innerRef])
+
+  const hidePreview = useCallback(() => {
+    if (previewHRef.current) previewHRef.current.style.display = 'none'
+    if (previewVRef.current) previewVRef.current.style.display = 'none'
+  }, [])
+
+  // Document-level tracking during ruler drag
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const drag = rulerDragRef.current
+      if (!drag) return
+      const { x, y } = toPageCoord(e.clientX, e.clientY)
+      const pos = drag.type === 'h' ? y : x
+      rulerDragRef.current = { ...drag, pos }
+      showPreview(drag.type, pos)
+    }
+    const onUp = (e: MouseEvent) => {
+      const drag = rulerDragRef.current
+      if (!drag) return
+      const { x, y } = toPageCoord(e.clientX, e.clientY)
+      const pos = drag.type === 'h' ? y : x
+      rulerDragRef.current = null
+      hidePreview()
+      if (pos >= 0) {
+        changeRef.current([...guidesRef.current, { id: `g${++_gseq}`, type: drag.type, pos }])
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+  }, [toPageCoord, showPreview, hidePreview])
+
+  // Mousedown on each ruler canvas starts a guide drag
+  useEffect(() => {
+    const hc = hRef.current
+    const vc = vRef.current
+    if (!hc || !vc) return
+    const onHDown = (e: MouseEvent) => {
+      e.preventDefault()
+      const { y } = toPageCoord(e.clientX, e.clientY)
+      rulerDragRef.current = { type: 'h', pos: y }
+      showPreview('h', y)
+    }
+    const onVDown = (e: MouseEvent) => {
+      e.preventDefault()
+      const { x } = toPageCoord(e.clientX, e.clientY)
+      rulerDragRef.current = { type: 'v', pos: x }
+      showPreview('v', x)
+    }
+    hc.addEventListener('mousedown', onHDown)
+    vc.addEventListener('mousedown', onVDown)
+    return () => {
+      hc.removeEventListener('mousedown', onHDown)
+      vc.removeEventListener('mousedown', onVDown)
+    }
+  }, [toPageCoord, showPreview])
+
+  const draw = useCallback(() => {
+    const inner = innerRef.current
+    const hc    = hRef.current
+    const vc    = vRef.current
+    if (!inner || !hc || !vc) return
+
+    const { scrollLeft, scrollTop, clientWidth, clientHeight } = inner
+    const z   = zoomRef.current
+    const CM  = CM_PX * z
+    const dpr = window.devicePixelRatio || 1
+
+    // ── Horizontal ruler — full width of canvas-inner ──────────
+    // clientWidth is already the inner width (outer minus 22px left offset)
+    const hw = clientWidth
+    const hh = RULER_SIZE
+    const hwPx = Math.round(hw * dpr)
+    const hhPx = Math.round(hh * dpr)
+    if (hc.width !== hwPx || hc.height !== hhPx) {
+      hc.width  = hwPx; hc.height = hhPx
+      hc.style.width = hw + 'px'; hc.style.height = hh + 'px'
+    }
+    const hCtx = hc.getContext('2d')!
+    hCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    hCtx.fillStyle = '#F0F0F0'
+    hCtx.fillRect(0, 0, hw, hh)
+    hCtx.strokeStyle = '#C8C8C8'
+    hCtx.lineWidth   = 0.5
+    hCtx.beginPath(); hCtx.moveTo(0, hh - 0.5); hCtx.lineTo(hw, hh - 0.5); hCtx.stroke()
+
+    const originX = SCROLL_PAD - scrollLeft
+    const startI  = Math.floor(-originX / CM) - 1
+    const endI    = Math.ceil((hw - originX) / CM) + 1
+
+    // Minor ticks — every 1cm, no label
+    hCtx.strokeStyle = '#CACACA'
+    hCtx.lineWidth   = 0.6
+    for (let i = startI; i <= endI; i++) {
+      if (i % 5 === 0) continue
+      const x = originX + i * CM
+      if (x < 0 || x > hw) continue
+      hCtx.beginPath(); hCtx.moveTo(x, hh - 4); hCtx.lineTo(x, hh); hCtx.stroke()
+    }
+
+    // Major ticks — every 5cm, with label
+    hCtx.strokeStyle  = '#888'
+    hCtx.lineWidth    = 0.8
+    hCtx.fillStyle    = '#555'
+    hCtx.font         = '10px Arial, sans-serif'
+    hCtx.textBaseline = 'top'
+    hCtx.textAlign    = 'left'
+    for (let i = startI; i <= endI; i++) {
+      if (i % 5 !== 0) continue
+      const x = originX + i * CM
+      if (x < 0 || x > hw) continue
+      hCtx.beginPath(); hCtx.moveTo(x, hh - 8); hCtx.lineTo(x, hh); hCtx.stroke()
+      if (i !== 0 && x > 4 && x < hw - 16) hCtx.fillText(String(i), x + 2, 2)
+    }
+
+    // ── Vertical ruler — full height of canvas-inner ───────────
+    const vw = RULER_SIZE
+    const vh = clientHeight
+    const vwPx = Math.round(vw * dpr)
+    const vhPx = Math.round(vh * dpr)
+    if (vc.width !== vwPx || vc.height !== vhPx) {
+      vc.width  = vwPx; vc.height = vhPx
+      vc.style.width = vw + 'px'; vc.style.height = vh + 'px'
+    }
+    const vCtx = vc.getContext('2d')!
+    vCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    vCtx.fillStyle = '#F0F0F0'
+    vCtx.fillRect(0, 0, vw, vh)
+    vCtx.strokeStyle = '#C8C8C8'
+    vCtx.lineWidth   = 0.5
+    vCtx.beginPath(); vCtx.moveTo(vw - 0.5, 0); vCtx.lineTo(vw - 0.5, vh); vCtx.stroke()
+
+    const originY = SCROLL_PAD - scrollTop
+    const startJ  = Math.floor(-originY / CM) - 1
+    const endJ    = Math.ceil((vh - originY) / CM) + 1
+
+    // Minor ticks — every 1cm, no label
+    vCtx.strokeStyle = '#CACACA'
+    vCtx.lineWidth   = 0.6
+    for (let j = startJ; j <= endJ; j++) {
+      if (j % 5 === 0) continue
+      const y = originY + j * CM
+      if (y < 0 || y > vh) continue
+      vCtx.beginPath(); vCtx.moveTo(vw - 4, y); vCtx.lineTo(vw, y); vCtx.stroke()
+    }
+
+    // Major ticks — every 5cm, with label
+    vCtx.strokeStyle  = '#888'
+    vCtx.lineWidth    = 0.8
+    vCtx.fillStyle    = '#555'
+    vCtx.font         = '10px Arial, sans-serif'
+    vCtx.textBaseline = 'middle'
+    vCtx.textAlign    = 'right'
+    for (let j = startJ; j <= endJ; j++) {
+      if (j % 5 !== 0) continue
+      const y = originY + j * CM
+      if (y < 0 || y > vh) continue
+      vCtx.beginPath(); vCtx.moveTo(vw - 8, y); vCtx.lineTo(vw, y); vCtx.stroke()
+      if (j !== 0 && y > 8 && y < vh - 4) {
+        vCtx.save()
+        vCtx.translate(vw - 10, y)
+        vCtx.rotate(-Math.PI / 2)
+        vCtx.fillText(String(j), 0, 0)
+        vCtx.restore()
+      }
+    }
+  }, [innerRef])
+
+  useEffect(() => {
+    const inner = innerRef.current
+    if (!inner) return
+    inner.addEventListener('scroll', draw, { passive: true })
+    requestAnimationFrame(draw)
+    return () => inner.removeEventListener('scroll', draw)
+  }, [draw, innerRef])
+
+  useEffect(() => { requestAnimationFrame(draw) }, [zoom, draw])
+
+  useEffect(() => {
+    const onResize = () => requestAnimationFrame(draw)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [draw])
+
+  return (
+    <>
+      <div className="canvas-ruler-corner" />
+      <canvas ref={hRef} className="canvas-ruler-h" style={{ cursor: 's-resize' }} />
+      <canvas ref={vRef} className="canvas-ruler-v" style={{ cursor: 'e-resize' }} />
+      <div ref={previewHRef} className="canvas-ruler-preview-h" />
+      <div ref={previewVRef} className="canvas-ruler-preview-v" />
+    </>
   )
 }
 
@@ -1275,7 +1469,7 @@ export default function Canvas({
   const scaledH = SPREAD_H * zoom
 
   return (
-    <div className="canvas-outer" ref={outerRef}>
+    <div className={`canvas-outer${rulerMode ? ' canvas-ruler-active' : ''}`} ref={outerRef}>
       {/* ── Scrollable + centered area ── */}
       <div className="canvas-inner" ref={innerRef}>
         <div className="canvas-scroll-pad">
@@ -1305,7 +1499,7 @@ export default function Canvas({
                   <canvas ref={leftElRef} />
                   <BleedOverlay />
                   {showGrid && <GridOverlay settings={gridSettings} />}
-                  {rulerMode && <RulerAndGuides pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={leftPageWrapRef} />}
+                  {rulerMode && <GuidesOverlay pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={leftPageWrapRef} />}
                   {isLastSpread && (
                     <div className="canvas-logo-overlay" aria-hidden="true">
                       <img src="/LogoZeika.jpg" alt="Zeika Memories" className="canvas-logo-img" />
@@ -1367,7 +1561,7 @@ export default function Canvas({
                   <canvas ref={rightElRef} />
                   <BleedOverlay />
                   {showGrid && <GridOverlay settings={gridSettings} />}
-                  {rulerMode && <RulerAndGuides pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={rightPageWrapRef} />}
+                  {rulerMode && <GuidesOverlay pageW={PAGE_W} pageH={PAGE_H} zoom={zoom} guides={guides} onGuidesChange={onGuidesChange} pageWrapRef={rightPageWrapRef} />}
                   {isLastSpread && (
                     <div className="canvas-no-edit-overlay" aria-hidden="true">
                       <span className="canvas-no-edit-label">No editable</span>
@@ -1427,6 +1621,9 @@ export default function Canvas({
         </div>
         </div>
       </div>
+
+      {/* ── Viewport rulers — fixed to canvas-outer edges ── */}
+      {rulerMode && <ViewportRulers zoom={zoom} innerRef={innerRef} guides={guides} onGuidesChange={onGuidesChange} />}
 
       {/* ── Viewport pan overlay — intercepts all pointer events during pan mode ── */}
       {isViewportPanning && (

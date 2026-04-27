@@ -15,6 +15,10 @@ interface LayoutPanelProps {
   onLayoutSelect: (layout: Layout) => void
 }
 
+type MainTab = 'layouts' | 'fondos' | 'deco'
+type FondosSubTab = 'texturas' | 'fondos'
+type DecoSubTab = 'stickers' | 'graficos'
+
 const PHOTO_COUNTS = [1, 2, 3, 4, 5]
 
 function LayoutThumbnail({ layout }: { layout: Layout }) {
@@ -45,60 +49,127 @@ export default function LayoutPanel({
   onLayoutSelect,
 }: LayoutPanelProps) {
   const { t } = useLang()
+  const [activeTab, setActiveTab] = useState<MainTab>('layouts')
+  const [fondosSubTab, setFondosSubTab] = useState<FondosSubTab>('texturas')
+  const [decoSubTab, setDecoSubTab] = useState<DecoSubTab>('stickers')
   const [displayFilter, setDisplayFilter] = useState<number | 'all'>(selectedPhotoCount)
 
   const layouts = displayFilter === 'all' ? LAYOUTS : getLayoutsByCantidad(displayFilter)
 
   return (
     <aside className="layout-panel">
-      {/* ── Header ── */}
-      <div className="layout-panel-header">
-        <span className="layout-panel-title">{t.layouts}</span>
-        <div className="layout-panel-bar" />
-      </div>
 
-      {/* ── Selector de cantidad de fotos ── */}
-      <div className="layout-count-selector">
-        {PHOTO_COUNTS.map((count) => (
-          <button
-            key={count}
-            className={`layout-count-btn${displayFilter === count ? ' layout-count-btn--active' : ''}`}
-            onClick={() => { onPhotoCountChange(count); setDisplayFilter(count) }}
-            aria-label={`${count} foto${count > 1 ? 's' : ''}`}
-          >
-            {count}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Todos ── */}
-      <div className="layout-all-row">
+      {/* ── Main tabs ── */}
+      <div className="panel-tabs">
         <button
-          className={`layout-all-btn${displayFilter === 'all' ? ' layout-all-btn--active' : ''}`}
-          onClick={() => setDisplayFilter('all')}
+          className={`panel-tab${activeTab === 'layouts' ? ' panel-tab--active' : ''}`}
+          onClick={() => setActiveTab('layouts')}
         >
-          {t.all}
+          Layouts
+        </button>
+        <button
+          className={`panel-tab${activeTab === 'fondos' ? ' panel-tab--active' : ''}`}
+          onClick={() => setActiveTab('fondos')}
+        >
+          Fondos
+        </button>
+        <button
+          className={`panel-tab${activeTab === 'deco' ? ' panel-tab--active' : ''}`}
+          onClick={() => setActiveTab('deco')}
+        >
+          Deco
         </button>
       </div>
 
-      {/* ── Grid de layouts ── */}
-      <div className="layout-grid">
-        {layouts.map((layout) => (
-          <button
-            key={layout.id}
-            className={`layout-thumb${selectedLayoutId === layout.id ? ' layout-thumb--selected' : ''}`}
-            onClick={() => onLayoutSelect(layout)}
-            aria-label={layout.nombre}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('application/zeika-layout', layout.id)
-              e.dataTransfer.effectAllowed = 'copy'
-            }}
-          >
-            <LayoutThumbnail layout={layout} />
-          </button>
-        ))}
-      </div>
+      {/* ── Layouts tab ── */}
+      {activeTab === 'layouts' && (
+        <>
+          <div className="layout-count-selector">
+            {PHOTO_COUNTS.map((count) => (
+              <button
+                key={count}
+                className={`layout-count-btn${displayFilter === count ? ' layout-count-btn--active' : ''}`}
+                onClick={() => { onPhotoCountChange(count); setDisplayFilter(count) }}
+                aria-label={`${count} foto${count > 1 ? 's' : ''}`}
+              >
+                {count}
+              </button>
+            ))}
+          </div>
+          <div className="layout-all-row">
+            <button
+              className={`layout-all-btn${displayFilter === 'all' ? ' layout-all-btn--active' : ''}`}
+              onClick={() => setDisplayFilter('all')}
+            >
+              {t.all}
+            </button>
+          </div>
+          <div className="layout-grid">
+            {layouts.map((layout) => (
+              <button
+                key={layout.id}
+                className={`layout-thumb${selectedLayoutId === layout.id ? ' layout-thumb--selected' : ''}`}
+                onClick={() => onLayoutSelect(layout)}
+                aria-label={layout.nombre}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/zeika-layout', layout.id)
+                  e.dataTransfer.effectAllowed = 'copy'
+                }}
+              >
+                <LayoutThumbnail layout={layout} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Fondos tab ── */}
+      {activeTab === 'fondos' && (
+        <>
+          <div className="panel-subtabs">
+            <button
+              className={`panel-subtab${fondosSubTab === 'texturas' ? ' panel-subtab--active' : ''}`}
+              onClick={() => setFondosSubTab('texturas')}
+            >
+              Texturas
+            </button>
+            <button
+              className={`panel-subtab${fondosSubTab === 'fondos' ? ' panel-subtab--active' : ''}`}
+              onClick={() => setFondosSubTab('fondos')}
+            >
+              Fondos
+            </button>
+          </div>
+          <div className="panel-content-grid">
+            <p className="panel-empty">Próximamente</p>
+          </div>
+        </>
+      )}
+
+      {/* ── Deco tab ── */}
+      {activeTab === 'deco' && (
+        <>
+          <div className="panel-subtabs">
+            <button
+              className={`panel-subtab${decoSubTab === 'stickers' ? ' panel-subtab--active' : ''}`}
+              onClick={() => setDecoSubTab('stickers')}
+            >
+              Stickers
+            </button>
+            <button
+              className={`panel-subtab${decoSubTab === 'graficos' ? ' panel-subtab--active' : ''}`}
+              onClick={() => setDecoSubTab('graficos')}
+            >
+              Gráficos
+            </button>
+          </div>
+          <div className="panel-content-grid">
+            <p className="panel-empty">Próximamente</p>
+          </div>
+        </>
+      )}
+
     </aside>
   )
 }

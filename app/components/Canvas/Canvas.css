@@ -15,6 +15,69 @@
   overflow: auto;
 }
 
+/* When rulers are active, offset scroll area so rulers don't overlay content */
+.canvas-ruler-active .canvas-inner {
+  top: 22px;
+  left: 22px;
+}
+
+/* ─── Viewport rulers ────────────────────────────────────────────────────────── */
+
+.canvas-ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  background: #E4E4E4;
+  z-index: 51;
+  flex-shrink: 0;
+}
+
+.canvas-ruler-h {
+  position: absolute;
+  top: 0;
+  left: 22px;
+  right: 0;
+  height: 22px;
+  display: block;
+  z-index: 50;
+  background: #F0F0F0;
+}
+
+.canvas-ruler-v {
+  position: absolute;
+  top: 22px;
+  left: 0;
+  bottom: 0;
+  width: 22px;
+  display: block;
+  z-index: 50;
+  background: #F0F0F0;
+}
+
+.canvas-ruler-preview-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #00C073;
+  pointer-events: none;
+  z-index: 55;
+  display: none;
+}
+
+.canvas-ruler-preview-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #00C073;
+  pointer-events: none;
+  z-index: 55;
+  display: none;
+}
+
 /* Adds uniform padding around the spread to create pan room in all directions */
 .canvas-scroll-pad {
   display: inline-block;
@@ -97,7 +160,7 @@
   pointer-events: none;
 }
 
-.canvas-ruler-overlay {
+.canvas-guides-overlay {
   position: absolute;
   top: 0;
   left: 0;
