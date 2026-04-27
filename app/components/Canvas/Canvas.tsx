@@ -834,7 +834,7 @@ export default function Canvas({
     // loadFromJSON, which restores objects but loses some runtime-only state.
     const reapplyPhotoState = (fc: fabric.Canvas) => {
       for (const obj of fc.getObjects()) {
-        const data = (obj as fabric.FabricObject & { data?: { type: string } }).data
+        const data = (obj as unknown as fabric.FabricObject & { data?: { type: string } }).data
         if (data?.type === 'photo') {
           if (obj.clipPath) obj.clipPath.absolutePositioned = true
           obj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
@@ -999,7 +999,7 @@ export default function Canvas({
           obj.set({ lockUniScaling: false })
           obj.setControlsVisibility({ mt: false, mb: false })
         }
-        const data = (obj as fabric.FabricObject & { data?: { type: string } }).data
+        const data = (obj as unknown as fabric.FabricObject & { data?: { type: string } }).data
         if (data?.type === 'freePhoto') {
           obj.set({ lockUniScaling: true })
           obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
@@ -1128,9 +1128,9 @@ export default function Canvas({
       fc.on('mouse:dblclick', (e) => {
         const obj = fc.findTarget(e.e)
 
-        if (obj && (obj as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
+        if (obj && (obj as unknown as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
           isPanMode.current    = true   // FIRST — before any Fabric property changes
-          panTargetRef.current = obj as fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
+          panTargetRef.current = obj as unknown as fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
           panData.current      = null
           fc.discardActiveObject()
           fc.selection     = false
@@ -1167,7 +1167,7 @@ export default function Canvas({
       const cloned = await obj.clone()
       cloned.set({ left: (cloned.left ?? 0) + offsetX })
 
-      const srcData = (obj as fabric.FabricObject & { data?: Record<string, unknown> }).data
+      const srcData = (obj as unknown as fabric.FabricObject & { data?: Record<string, unknown> }).data
       if (srcData) {
         const newData = { ...srcData }
         if (newData.type === 'photo') {
@@ -1226,7 +1226,7 @@ export default function Canvas({
         const obj = activeCanvas.getActiveObject()
         if (!obj) return
 
-        const d = (obj as fabric.FabricObject & { data?: Record<string, unknown> }).data
+        const d = (obj as unknown as fabric.FabricObject & { data?: Record<string, unknown> }).data
 
         if (d?.type === 'photo' && obj instanceof fabric.FabricImage) {
           clipboard.current = {
@@ -1372,7 +1372,7 @@ export default function Canvas({
 
         for (const obj of selected) {
           if (obj instanceof fabric.Textbox) { hasText = true; continue }
-          const data = (obj as fabric.FabricObject & { data?: { type: string } & FrameCoords }).data
+          const data = (obj as unknown as fabric.FabricObject & { data?: { type: string } & FrameCoords }).data
           // Deep-copy coords before discard mutates anything
           if (data?.type === 'photo') framesToRestore.push({ frameX: data.frameX, frameY: data.frameY, frameW: data.frameW, frameH: data.frameH })
         }
