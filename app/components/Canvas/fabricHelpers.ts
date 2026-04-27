@@ -633,7 +633,7 @@ export async function exportPageAsJpg(
   canvasHeight: number,
   multiplier: number = 3.125,
 ): Promise<string> {
-  const offscreen = new fabric.Canvas(null, {
+  const offscreen = new fabric.Canvas(undefined, {
     width: canvasWidth,
     height: canvasHeight,
     backgroundColor: '#ffffff',
