@@ -1034,9 +1034,9 @@ export default function Canvas({
         const obj = fc.getActiveObject()
         if (obj instanceof fabric.Textbox && onTextEditRef.current) {
           // Exit Fabric's built-in cursor editing and open the modal instead
-          ;(obj as fabric.Textbox).exitEditing()
+          ;(obj as unknown as fabric.Textbox).exitEditing()
           fc.renderAll()
-          onTextEditRef.current(obj as fabric.Textbox, side)
+          onTextEditRef.current(obj as unknown as fabric.Textbox, side)
           return
         }
         setTextEditing(true)
@@ -1045,7 +1045,7 @@ export default function Canvas({
 
       // ── Photo scaling: maintain cover-fit, update clipPath ────────────────
       fc.on('object:scaling', (e) => {
-        const obj = e.target as fabric.FabricImage & {
+        const obj = e.target as unknown as fabric.FabricImage & {
           data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number }
           clipPath?: fabric.Rect
         }
@@ -1095,7 +1095,7 @@ export default function Canvas({
       // Fires only in STATE 2 (selectable=true). In pan mode selectable=false
       // so Fabric never generates drag transforms for the pan target.
       fc.on('object:moving', (e) => {
-        const obj = e.target as fabric.FabricObject & {
+        const obj = e.target as unknown as fabric.FabricObject & {
           data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number }
           clipPath?: fabric.Rect
         }
@@ -1116,7 +1116,7 @@ export default function Canvas({
         }
 
         // Cross-canvas drag highlight
-        const cx2 = (e.target as fabric.FabricObject).getCenterPoint().x
+        const cx2 = (e.target as unknown as fabric.FabricObject).getCenterPoint().x
         setDragOverPage(
           side === 'left'
             ? (cx2 > PAGE_W * 0.85 ? 'right' : null)
@@ -1173,7 +1173,7 @@ export default function Canvas({
         if (newData.type === 'photo') {
           newData.frameX = ((newData.frameX as number) ?? 0) + offsetX
         }
-        ;(cloned as fabric.FabricObject & { data: Record<string, unknown> }).data = newData
+        ;(cloned as unknown as fabric.FabricObject & { data: Record<string, unknown> }).data = newData
       }
 
       // Update cloned clipPath position to match new canvas offset
@@ -1197,13 +1197,13 @@ export default function Canvas({
     lc.on('object:modified', async (e) => {
       if ((e as unknown as { transform?: { action?: string } }).transform?.action !== 'drag') return
       if (!e.target || isPanMode.current) return
-      const cx = (e.target as fabric.FabricObject).getCenterPoint().x
+      const cx = (e.target as unknown as fabric.FabricObject).getCenterPoint().x
       if (cx > PAGE_W) await transferToCanvas(e.target, lc, rc, -CANVAS_GAP)
     })
     rc.on('object:modified', async (e) => {
       if ((e as unknown as { transform?: { action?: string } }).transform?.action !== 'drag') return
       if (!e.target || isPanMode.current) return
-      const cx = (e.target as fabric.FabricObject).getCenterPoint().x
+      const cx = (e.target as unknown as fabric.FabricObject).getCenterPoint().x
       if (cx < 0) await transferToCanvas(e.target, rc, lc, CANVAS_GAP)
     })
 
@@ -1221,7 +1221,7 @@ export default function Canvas({
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         // Don't intercept while a textbox is being edited
         if (activeCanvas.getActiveObject() instanceof fabric.Textbox &&
-            (activeCanvas.getActiveObject() as fabric.Textbox).isEditing) return
+            (activeCanvas.getActiveObject() as unknown as fabric.Textbox).isEditing) return
         e.preventDefault()
         const obj = activeCanvas.getActiveObject()
         if (!obj) return
@@ -1299,7 +1299,7 @@ export default function Canvas({
             absolutePositioned: true,
           })
           img.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true })
-          ;(img as fabric.FabricObject & { data: Record<string, unknown> }).data = {
+          ;(img as unknown as fabric.FabricObject & { data: Record<string, unknown> }).data = {
             type: 'photo', frameX: fx, frameY: fy, frameW: cb.frameW, frameH: cb.frameH,
             naturalW: cb.naturalW, naturalH: cb.naturalH,
             imgLeft: cb.left + OFF, imgTop: cb.top + OFF,
@@ -1325,7 +1325,7 @@ export default function Canvas({
             fontFamily: cb.fontFamily,
             fontSize:   cb.fontSize,
             fill:       cb.fill,
-          }) as fabric.Textbox & { data: { type: string } }
+          }) as unknown as fabric.Textbox & { data: { type: string } }
           textbox.data = { type: 'text' }
           activeCanvas.add(textbox)
           activeCanvas.setActiveObject(textbox)
@@ -1364,7 +1364,7 @@ export default function Canvas({
         const selected = fc.getActiveObjects().slice()
         if (selected.length === 0) continue
 
-        if (selected.some(o => o instanceof fabric.Textbox && (o as fabric.Textbox).isEditing)) return
+        if (selected.some(o => o instanceof fabric.Textbox && (o as unknown as fabric.Textbox).isEditing)) return
 
         type FrameCoords = { frameX: number; frameY: number; frameW: number; frameH: number }
         const framesToRestore: FrameCoords[] = []
@@ -1425,7 +1425,7 @@ export default function Canvas({
 
       const frame = findFrameAtPoint(fc, x, y)
       if (frame) {
-        await dropPhotoOnFrame(fc, frame as fabric.Rect, photoUrl, PAGE_W, PAGE_H)
+        await dropPhotoOnFrame(fc, frame as unknown as fabric.Rect, photoUrl, PAGE_W, PAGE_H)
         const photoId = e.dataTransfer.getData('application/zeika-photo-id')
         if (photoId) onPhotoDropRef.current(photoId)
         return
