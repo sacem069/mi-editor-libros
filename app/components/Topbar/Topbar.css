@@ -120,6 +120,98 @@
   background: var(--color-cream);
 }
 
+/* ── Active state for icon buttons ──────────────────────────────────────── */
+
+.topbar-action-btn--active svg {
+  color: var(--color-blue);
+}
+
+/* ── Share popover ───────────────────────────────────────────────────────── */
+
+.topbar-share-wrap {
+  position: relative;
+}
+
+.topbar-share-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--color-white);
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 14px 14px 14px;
+  min-width: 300px;
+  z-index: 200;
+}
+
+.topbar-share-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: #888;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+
+.topbar-share-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.topbar-share-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-black);
+  background: var(--color-cream);
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 7px 9px;
+  outline: none;
+  min-width: 0;
+  cursor: text;
+}
+
+.topbar-share-input:focus {
+  border-color: var(--color-blue);
+}
+
+.topbar-share-copy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: none;
+  border-radius: 3px;
+  padding: 7px 11px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  transition: background 0.1s;
+  min-width: 34px;
+  justify-content: center;
+}
+
+.topbar-share-copy:hover {
+  background: #333;
+}
+
+.topbar-share-copy--copied {
+  background: var(--color-blue);
+}
+
+.topbar-share-copy--copied:hover {
+  background: var(--color-blue);
+}
+
 /* ── Language toggle ─────────────────────────────────────────────────────── */
 
 .topbar-lang-toggle {

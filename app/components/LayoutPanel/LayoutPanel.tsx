@@ -13,7 +13,10 @@ interface LayoutPanelProps {
   selectedLayoutId: string | null
   onPhotoCountChange: (count: number) => void
   onLayoutSelect: (layout: Layout) => void
+  onApplyTexture?: (url: string) => void
 }
+
+const TEXTURES = Array.from({ length: 9 }, (_, i) => `/text${i + 1}.jpg`)
 
 type MainTab = 'layouts' | 'fondos' | 'deco'
 type FondosSubTab = 'texturas' | 'fondos'
@@ -47,6 +50,7 @@ export default function LayoutPanel({
   selectedLayoutId,
   onPhotoCountChange,
   onLayoutSelect,
+  onApplyTexture,
 }: LayoutPanelProps) {
   const { t } = useLang()
   const [activeTab, setActiveTab] = useState<MainTab>('layouts')
@@ -142,7 +146,22 @@ export default function LayoutPanel({
             </button>
           </div>
           <div className="panel-content-grid">
-            <p className="panel-empty">Próximamente</p>
+            {fondosSubTab === 'texturas' ? (
+              <div className="texture-grid">
+                {TEXTURES.map((url) => (
+                  <button
+                    key={url}
+                    className="texture-thumb"
+                    onClick={() => onApplyTexture?.(url)}
+                    aria-label={url}
+                  >
+                    <img src={url} alt="" className="texture-img" draggable={false} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="panel-empty">Próximamente</p>
+            )}
           </div>
         </>
       )}

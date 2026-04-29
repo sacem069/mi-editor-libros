@@ -222,3 +222,34 @@
   position: absolute;
   background: #d2d2d2;
 }
+
+/* ── Texture grid ────────────────────────────────────────────────────────── */
+
+.texture-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 2px;
+}
+
+.texture-thumb {
+  background: none;
+  border: 1px solid #d0d0d0;
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  aspect-ratio: 1;
+  transition: border-color 0.12s;
+}
+
+.texture-thumb:hover {
+  border-color: var(--color-blue);
+}
+
+.texture-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

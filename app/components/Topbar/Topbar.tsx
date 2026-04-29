@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './Topbar.css'
 import Image from 'next/image'
-import { Info, Share2, ArrowDownToLine, Eye } from 'lucide-react'
+import { Info, Share2, ArrowDownToLine, Eye, Copy, Check } from 'lucide-react'
 import { useLang } from '../../context/LanguageContext'
 
 interface TopbarProps {
@@ -11,23 +11,64 @@ interface TopbarProps {
   onExportJpg: () => void
   onExportPdf: () => void
   isExporting: boolean
+  projectId: string
+  onShare?: () => void
 }
 
-export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExporting }: TopbarProps) {
+export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExporting, projectId, onShare }: TopbarProps) {
   const { lang, t, toggleLang } = useLang()
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // ── Export dropdown ────────────────────────────────────────────────────────
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!dropdownOpen) return
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
-      }
+    if (!exportOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [dropdownOpen])
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [exportOpen])
+
+  // ── Share popover ──────────────────────────────────────────────────────────
+  const [shareOpen, setShareOpen] = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const shareRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!shareOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [shareOpen])
+
+  const handleShareClick = () => {
+    onShare?.()
+    setShareOpen((v) => !v)
+  }
+
+  const handleCopy = async () => {
+    const url = `${window.location.origin}/preview/${projectId}`
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = url
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/preview/${projectId}`
+    : ''
 
   return (
     <div className="topbar">
@@ -45,32 +86,65 @@ export default function Topbar({ onPreview, onExportJpg, onExportPdf, isExportin
           <Info size={22} strokeWidth={1.5} />
           <span className="topbar-tooltip">{t.description}</span>
         </button>
-        <button className="topbar-action-btn">
-          <Share2 size={22} strokeWidth={1.5} />
-          <span className="topbar-tooltip">{t.share}</span>
-        </button>
 
-        <div className="topbar-export-wrapper" ref={wrapperRef}>
+        {/* Share button + popover */}
+        <div className="topbar-share-wrap" ref={shareRef}>
+          <button
+            className={`topbar-action-btn${shareOpen ? ' topbar-action-btn--active' : ''}`}
+            onClick={handleShareClick}
+          >
+            <Share2 size={22} strokeWidth={1.5} />
+            <span className="topbar-tooltip">{t.share}</span>
+          </button>
+
+          {shareOpen && (
+            <div className="topbar-share-popover">
+              <p className="topbar-share-label">Link de previsualización</p>
+              <div className="topbar-share-row">
+                <input
+                  className="topbar-share-input"
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  className={`topbar-share-copy${copied ? ' topbar-share-copy--copied' : ''}`}
+                  onClick={handleCopy}
+                  aria-label={copied ? '¡Copiado!' : 'Copiar'}
+                >
+                  {copied
+                    ? <Check size={15} strokeWidth={2.5} />
+                    : <Copy size={15} strokeWidth={1.5} />
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Export dropdown */}
+        <div className="topbar-export-wrapper" ref={exportRef}>
           <button
             className="topbar-action-btn"
-            onClick={() => setDropdownOpen((v) => !v)}
+            onClick={() => setExportOpen((v) => !v)}
             disabled={isExporting}
           >
             <ArrowDownToLine size={22} strokeWidth={1.5} />
             <span className="topbar-tooltip">{isExporting ? t.exporting : t.save}</span>
           </button>
 
-          {dropdownOpen && (
+          {exportOpen && (
             <div className="topbar-export-dropdown">
               <button
                 className="topbar-export-option"
-                onClick={() => { setDropdownOpen(false); onExportJpg() }}
+                onClick={() => { setExportOpen(false); onExportJpg() }}
               >
                 {t.exportJpg}
               </button>
               <button
                 className="topbar-export-option"
-                onClick={() => { setDropdownOpen(false); onExportPdf() }}
+                onClick={() => { setExportOpen(false); onExportPdf() }}
               >
                 {t.exportPdf}
               </button>

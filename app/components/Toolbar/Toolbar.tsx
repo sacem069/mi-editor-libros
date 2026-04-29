@@ -1,9 +1,10 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler, Hand, PaintBucket, Pipette, Grid } from 'lucide-react'
+import { Undo2, Redo2, Shapes, ImageUpscale, Type, Ruler, Hand, PaintBucket, Pipette, Grid, Square, Circle, Triangle, Minus, ArrowRight } from 'lucide-react'
 import { useLang } from '../../context/LanguageContext'
 import type { GridSettings } from '../Canvas/Canvas'
+import type { ShapeKind } from '../Canvas/fabricHelpers'
 import './Toolbar.css'
 
 interface ToolbarProps {
@@ -27,7 +28,16 @@ interface ToolbarProps {
   onApplyBgToAll: () => void
   onToggleGrid: () => void
   onGridSettingsChange: (s: GridSettings) => void
+  onAddShape?: (kind: ShapeKind) => void
 }
+
+const SHAPE_OPTIONS: { kind: ShapeKind; label: string; Icon: React.ComponentType<{ size: number; strokeWidth: number }> }[] = [
+  { kind: 'rect',     label: 'Rectángulo', Icon: Square    },
+  { kind: 'circle',   label: 'Círculo',    Icon: Circle    },
+  { kind: 'triangle', label: 'Triángulo',  Icon: Triangle  },
+  { kind: 'line',     label: 'Línea',      Icon: Minus     },
+  { kind: 'arrow',    label: 'Flecha',     Icon: ArrowRight },
+]
 
 export default function Toolbar({
   canUndo,
@@ -50,15 +60,19 @@ export default function Toolbar({
   onApplyBgToAll,
   onToggleGrid,
   onGridSettingsChange,
+  onAddShape,
 }: ToolbarProps) {
   const { t } = useLang()
-  const [paintOpen, setPaintOpen] = useState(false)
+  const [paintOpen, setPaintOpen]   = useState(false)
   const paintWrapRef  = useRef<HTMLDivElement>(null)
   const colorInputRef = useRef<HTMLInputElement>(null)
 
   const [gridOpen, setGridOpen]     = useState(false)
   const gridWrapRef                 = useRef<HTMLDivElement>(null)
   const gridColorRef                = useRef<HTMLInputElement>(null)
+
+  const [shapesOpen, setShapesOpen] = useState(false)
+  const shapesWrapRef               = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!paintOpen) return
@@ -81,6 +95,17 @@ export default function Toolbar({
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [gridOpen])
+
+  useEffect(() => {
+    if (!shapesOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (shapesWrapRef.current && !shapesWrapRef.current.contains(e.target as Node)) {
+        setShapesOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [shapesOpen])
 
   const handleEyedropper = async () => {
     type EyeDropperAPI = { open: () => Promise<{ sRGBHex: string }> }
@@ -118,13 +143,32 @@ export default function Toolbar({
           <span className="toolbar-tooltip">Deshacer</span>
         </button>
 
-        <button
-          className="toolbar-btn"
-          aria-label="Formas"
-        >
-          <Shapes size={22} strokeWidth={1.5} />
-          <span className="toolbar-tooltip">Formas</span>
-        </button>
+        {/* Shapes popover */}
+        <div className="toolbar-shapes-wrap" ref={shapesWrapRef}>
+          <button
+            className={`toolbar-btn${shapesOpen ? ' toolbar-btn--active' : ''}`}
+            onClick={() => setShapesOpen((v) => !v)}
+            aria-label="Formas"
+          >
+            <Shapes size={22} strokeWidth={1.5} />
+            <span className="toolbar-tooltip">Formas</span>
+          </button>
+
+          {shapesOpen && (
+            <div className="toolbar-shapes-popover">
+              {SHAPE_OPTIONS.map(({ kind, label, Icon }) => (
+                <button
+                  key={kind}
+                  className="toolbar-shape-btn"
+                  onClick={() => { onAddShape?.(kind); setShapesOpen(false) }}
+                >
+                  <Icon size={16} strokeWidth={1.5} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           className={`toolbar-btn${frameTool ? ' toolbar-btn--active' : ''}`}

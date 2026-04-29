@@ -1,0 +1,124 @@
+.share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(25, 25, 25, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-modal {
+  background: var(--color-white);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  width: 420px;
+  max-width: calc(100vw - 32px);
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.share-title {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-black);
+  letter-spacing: 0.1px;
+}
+
+.share-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  padding: 4px;
+  border-radius: 2px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.share-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-black);
+}
+
+.share-body {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.share-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-url-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-black);
+  background: var(--color-cream);
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  padding: 8px 10px;
+  outline: none;
+  cursor: text;
+  min-width: 0;
+}
+
+.share-url-input:focus {
+  border-color: var(--color-blue);
+}
+
+.share-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: none;
+  border-radius: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  transition: background 0.1s;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.share-copy-btn:hover {
+  background: #333;
+}
+
+.share-copy-btn--copied {
+  background: #2c7a5c;
+}
+
+.share-copy-btn--copied:hover {
+  background: #236349;
+}

@@ -34,7 +34,17 @@ type FreePhotoData = {
   naturalH: number
 }
 
-type FabricObjectWithData = fabric.FabricObject & { data: FrameData | PhotoData | TextData | FreePhotoData }
+export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'line' | 'arrow'
+
+type ShapeData = {
+  type:  'shape'
+  shape: ShapeKind
+}
+
+type FabricObjectWithData = fabric.FabricObject & { data: FrameData | PhotoData | TextData | FreePhotoData | ShapeData }
+
+// Arrow SVG path — 200 × 40 bounding box, pointing right
+const ARROW_PATH = 'M 0 10 L 140 10 L 140 0 L 200 20 L 140 40 L 140 30 L 0 30 Z'
 
 // ─── Utilidades ─────────────────────────────────────────────────────────────
 
@@ -452,6 +462,53 @@ export function addTextBox(
   return textbox
 }
 
+// ─── 5b. addShape ───────────────────────────────────────────────────────────
+
+export function addShape(
+  canvas: fabric.Canvas,
+  kind:   ShapeKind,
+  pageW:  number,
+  pageH:  number,
+): void {
+  const cx = pageW / 2
+  const cy = pageH / 2
+  const FILL = '#D0D0D0'
+  const base = {
+    originX:      'center' as const,
+    originY:      'center' as const,
+    left:         cx,
+    top:          cy,
+    strokeUniform: true,
+    selectable:   true,
+    evented:      true,
+  }
+
+  let obj: fabric.FabricObject
+
+  switch (kind) {
+    case 'rect':
+      obj = new fabric.Rect({ ...base, width: 200, height: 150, fill: FILL, stroke: 'transparent', strokeWidth: 0 })
+      break
+    case 'circle':
+      obj = new fabric.Ellipse({ ...base, rx: 100, ry: 100, fill: FILL, stroke: 'transparent', strokeWidth: 0 })
+      break
+    case 'triangle':
+      obj = new fabric.Triangle({ ...base, width: 180, height: 160, fill: FILL, stroke: 'transparent', strokeWidth: 0 })
+      break
+    case 'line':
+      obj = new fabric.Line([0, 0, 200, 0], { ...base, stroke: '#191919', strokeWidth: 3, fill: 'transparent' })
+      break
+    case 'arrow':
+      obj = new fabric.Path(ARROW_PATH, { ...base, fill: FILL, stroke: 'transparent', strokeWidth: 0 })
+      break
+  }
+
+  ;(obj as fabric.FabricObject & { data: ShapeData }).data = { type: 'shape', shape: kind }
+  canvas.add(obj)
+  canvas.setActiveObject(obj)
+  canvas.renderAll()
+}
+
 // ─── 6. serializePage ───────────────────────────────────────────────────────
 
 type SerializedFrame = {
@@ -490,13 +547,29 @@ type SerializedFreePhoto = {
   naturalH: number
 }
 
+type SerializedShape = {
+  shape:       ShapeKind
+  left:        number
+  top:         number
+  width:       number
+  height:      number
+  scaleX:      number
+  scaleY:      number
+  angle:       number
+  fill:        string
+  stroke:      string
+  strokeWidth: number
+}
+
 export type PageData = {
-  background:  string
-  pageW:       number
-  pageH:       number
-  frames:      SerializedFrame[]
-  texts:       SerializedText[]
-  freePhotos?: SerializedFreePhoto[]
+  background:       string
+  backgroundImage?: string
+  pageW:            number
+  pageH:            number
+  frames:           SerializedFrame[]
+  texts:            SerializedText[]
+  freePhotos?:      SerializedFreePhoto[]
+  shapes?:          SerializedShape[]
 }
 
 export function serializePage(
@@ -507,6 +580,7 @@ export function serializePage(
   const frames:      SerializedFrame[]     = []
   const texts:       SerializedText[]      = []
   const freePhotos:  SerializedFreePhoto[] = []
+  const shapes:      SerializedShape[]     = []
 
   for (const obj of canvas.getObjects()) {
     const data = (obj as FabricObjectWithData).data
@@ -565,16 +639,59 @@ export function serializePage(
         fill: (obj.fill as string) ?? '#191919',
       })
     }
+
+    if (data?.type === 'shape') {
+      const sd = data as ShapeData
+      const w = sd.shape === 'circle'
+        ? 2 * (obj as unknown as fabric.Ellipse).rx
+        : (obj.width ?? 100)
+      const h = sd.shape === 'circle'
+        ? 2 * (obj as unknown as fabric.Ellipse).ry
+        : (obj.height ?? 100)
+      shapes.push({
+        shape:       sd.shape,
+        left:        obj.left        ?? 0,
+        top:         obj.top         ?? 0,
+        width:       w,
+        height:      h,
+        scaleX:      obj.scaleX      ?? 1,
+        scaleY:      obj.scaleY      ?? 1,
+        angle:       obj.angle       ?? 0,
+        fill:        (obj.fill   as string) ?? '#D0D0D0',
+        stroke:      (obj.stroke as string) ?? 'transparent',
+        strokeWidth: obj.strokeWidth ?? 0,
+      })
+    }
   }
+
+  const bgImg = canvas.backgroundImage
+  const backgroundImage = bgImg instanceof fabric.FabricImage ? bgImg.getSrc() : undefined
 
   return {
     background: (canvas.backgroundColor as string) || '#FFFFFF',
+    backgroundImage,
     pageW,
     pageH,
     frames,
     texts,
     freePhotos,
+    shapes,
   }
+}
+
+// ─── 6b. setBackgroundTexture ────────────────────────────────────────────────
+
+export async function setBackgroundTexture(
+  canvas: fabric.Canvas,
+  url: string,
+  pageW: number,
+  pageH: number,
+): Promise<void> {
+  const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+  const scale = Math.max(pageW / (img.width || 1), pageH / (img.height || 1))
+  img.set({ originX: 'left', originY: 'top', left: 0, top: 0, scaleX: scale, scaleY: scale })
+  canvas.backgroundImage = img
+  canvas.renderAll()
 }
 
 // ─── 8. buildPageFromLayout ─────────────────────────────────────────────────
@@ -658,6 +775,14 @@ export async function deserializePage(
 ): Promise<void> {
   canvas.remove(...canvas.getObjects())
   canvas.backgroundColor = pageData.background || '#ffffff'
+  canvas.backgroundImage = undefined
+
+  if (pageData.backgroundImage) {
+    const bgImg = await fabric.FabricImage.fromURL(pageData.backgroundImage, { crossOrigin: 'anonymous' })
+    const scale = Math.max(pageW / (bgImg.width || 1), pageH / (bgImg.height || 1))
+    bgImg.set({ originX: 'left', originY: 'top', left: 0, top: 0, scaleX: scale, scaleY: scale })
+    canvas.backgroundImage = bgImg
+  }
 
   for (const sf of pageData.frames) {
     if (sf.isEmpty) {
@@ -768,6 +893,44 @@ export async function deserializePage(
 
     textbox.data = { type: 'text' }
     canvas.add(textbox)
+  }
+
+  for (const ss of pageData.shapes ?? []) {
+    const base = {
+      originX:       'center'  as const,
+      originY:       'center'  as const,
+      left:          ss.left,
+      top:           ss.top,
+      scaleX:        ss.scaleX,
+      scaleY:        ss.scaleY,
+      angle:         ss.angle,
+      fill:          ss.fill,
+      stroke:        ss.stroke,
+      strokeWidth:   ss.strokeWidth,
+      strokeUniform: true,
+      selectable:    true,
+      evented:       true,
+    }
+    let obj: fabric.FabricObject
+    switch (ss.shape) {
+      case 'rect':
+        obj = new fabric.Rect({ ...base, width: ss.width, height: ss.height })
+        break
+      case 'circle':
+        obj = new fabric.Ellipse({ ...base, rx: ss.width / 2, ry: ss.height / 2 })
+        break
+      case 'triangle':
+        obj = new fabric.Triangle({ ...base, width: ss.width, height: ss.height })
+        break
+      case 'line':
+        obj = new fabric.Line([0, 0, ss.width, 0], { ...base, fill: 'transparent' })
+        break
+      case 'arrow':
+        obj = new fabric.Path(ARROW_PATH, { ...base })
+        break
+    }
+    ;(obj as fabric.FabricObject & { data: ShapeData }).data = { type: 'shape', shape: ss.shape }
+    canvas.add(obj)
   }
 
   canvas.renderAll()

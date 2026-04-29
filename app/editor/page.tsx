@@ -22,10 +22,11 @@ import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 
 import { BOOK_SIZE }                                      from '../config/bookSize'
 import type { GridSettings, Guide }                        from '../components/Canvas/Canvas'
-import { applyLayout, addTextBox, serializePage,
+import { applyLayout, addTextBox, addShape, serializePage,
          deserializePage, dropPhotoOnFrame,
-         exportPageAsJpg, buildPageFromLayout }            from '../components/Canvas/fabricHelpers'
-import type { PageData, PhotoAssignment }                  from '../components/Canvas/fabricHelpers'
+         exportPageAsJpg, buildPageFromLayout,
+         setBackgroundTexture }                            from '../components/Canvas/fabricHelpers'
+import type { PageData, PhotoAssignment, ShapeKind }       from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
 import { LanguageProvider } from '../context/LanguageContext'
@@ -47,6 +48,9 @@ export default function EditorPage() {
 
   // ── Export ────────────────────────────────────────────────────────────────
   const [isExporting, setIsExporting] = useState(false)
+
+  // ── Project identity (stable for this session) ─────────────────────────────
+  const [projectId] = useState(() => crypto.randomUUID())
 
   // ── Preview ────────────────────────────────────────────────────────────────
   const [previewOpen,     setPreviewOpen]     = useState(false)
@@ -233,7 +237,8 @@ export default function EditorPage() {
     const isEmpty =
       pageData.frames.length === 0 &&
       pageData.texts.length  === 0 &&
-      (pageData.freePhotos?.length ?? 0) === 0
+      (pageData.freePhotos?.length ?? 0) === 0 &&
+      !pageData.backgroundImage
     if (isEmpty) {
       const c = document.createElement('canvas')
       c.width = THUMB_W; c.height = THUMB_H
@@ -398,6 +403,14 @@ export default function EditorPage() {
     saveCurrentSpread()
   }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Add shape → active page ────────────────────────────────────────────────
+  const handleAddShape = useCallback((kind: ShapeKind) => {
+    const fc = getActiveFabric()
+    if (!fc) return
+    addShape(fc, kind, PAGE_W, PAGE_H)
+    saveCurrentSpread()
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Text edit modal handlers ───────────────────────────────────────────────
   const handleTextEdit = useCallback((textbox: fabric.Textbox, side: 'left' | 'right') => {
     setTextModal({ textbox, side })
@@ -507,6 +520,8 @@ export default function EditorPage() {
         rc.remove(...rc.getObjects())
         lc.backgroundColor = '#ffffff'
         rc.backgroundColor = '#ffffff'
+        lc.backgroundImage = undefined
+        rc.backgroundImage = undefined
         lc.renderAll()
         rc.renderAll()
       }
@@ -700,11 +715,20 @@ export default function EditorPage() {
   }, [])
   const handleFrameToolDeactivate = useCallback(() => setFrameTool(false), [])
 
+  // ── Texture background ────────────────────────────────────────────────────
+  const handleApplyTexture = useCallback(async (url: string) => {
+    const fc = getActiveFabric()
+    if (!fc) return
+    await setBackgroundTexture(fc, url, PAGE_W, PAGE_H)
+    saveCurrentSpread()
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Page background color ─────────────────────────────────────────────────
   const handlePageBgChange = useCallback((color: string) => {
     const fc = getActiveFabric()
     if (!fc) return
     fc.backgroundColor = color
+    fc.backgroundImage = undefined
     fc.renderAll()
     setActivePageBg(color)
     saveCurrentSpread()
@@ -721,8 +745,8 @@ export default function EditorPage() {
       const snap = spreadsData.current[i]
       if (snap) {
         spreadsData.current[i] = {
-          left:  { ...snap.left,  background: color },
-          right: { ...snap.right, background: color },
+          left:  { ...snap.left,  background: color, backgroundImage: undefined },
+          right: { ...snap.right, background: color, backgroundImage: undefined },
         }
       } else {
         spreadsData.current[i] = { left: blankPage(), right: blankPage() }
@@ -732,8 +756,8 @@ export default function EditorPage() {
     // Apply live to the two visible canvases
     const lc = fabricLeft.current
     const rc = fabricRight.current
-    if (lc) { lc.backgroundColor = color; lc.renderAll() }
-    if (rc) { rc.backgroundColor = color; rc.renderAll() }
+    if (lc) { lc.backgroundColor = color; lc.backgroundImage = undefined; lc.renderAll() }
+    if (rc) { rc.backgroundColor = color; rc.backgroundImage = undefined; rc.renderAll() }
     saveCurrentSpread()
 
     // Regenerate thumbnails so the page strip reflects the new color immediately.
@@ -884,12 +908,21 @@ export default function EditorPage() {
 
   const handleClosePreview = useCallback(() => setPreviewOpen(false), [])
 
+  // ── Share: save project to localStorage so the preview route can load it ──
+  const handleShare = useCallback(() => {
+    saveCurrentSpread()
+    localStorage.setItem(
+      `zeika_project_${projectId}`,
+      JSON.stringify({ spreadsData: spreadsData.current, totalSpreads }),
+    )
+  }, [saveCurrentSpread, projectId, totalSpreads])
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <LanguageProvider>
     <>
     <div className="editor-root">
-      <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} onExportPdf={handleExportPdf} isExporting={isExporting} />
+      <Topbar onPreview={handleOpenPreview} onExportJpg={handleExportJpg} onExportPdf={handleExportPdf} isExporting={isExporting} projectId={projectId} onShare={handleShare} />
 
       <div className="editor-body">
         <PhotoPanel
@@ -923,6 +956,7 @@ export default function EditorPage() {
             onApplyBgToAll={handleApplyBgToAll}
             onToggleGrid={handleToggleGrid}
             onGridSettingsChange={handleGridSettingsChange}
+            onAddShape={handleAddShape}
           />
 
           {viewMode === 'spreads' ? (
@@ -976,6 +1010,7 @@ export default function EditorPage() {
           selectedLayoutId={selectedLayoutId}
           onPhotoCountChange={setSelectedPhotoCount}
           onLayoutSelect={handleLayoutSelect}
+          onApplyTexture={handleApplyTexture}
         />
       </div>
     </div>
