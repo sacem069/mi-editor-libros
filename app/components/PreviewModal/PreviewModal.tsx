@@ -34,6 +34,22 @@ const EMPTY_PAGE: PageData = {
 const TITLEBAR_H = 50
 const CONTROLS_H = 64
 
+// ── Gray "No editable" placeholder — matches the Canvas overlay style ─────────
+function renderNoEditPage(): string {
+  const canvas = document.createElement('canvas')
+  canvas.width  = PAGE_W
+  canvas.height = PAGE_H
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#e8e8e8'
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H)
+  ctx.fillStyle = '#666666'
+  ctx.font = `600 ${Math.round(PAGE_H * 0.055)}px Arial, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('No editable', PAGE_W / 2, PAGE_H / 2)
+  return canvas.toDataURL('image/jpeg', 1)
+}
+
 // ── Module-level turn.js loader (runs once per browser session) ──────────────
 let _turnLoaded = false
 const _turnQueue: Array<() => void> = []
@@ -66,7 +82,10 @@ export default function PreviewModal({
   const [scale,       setScale]       = useState(0.5)
   const [loading,     setLoading]     = useState(true)
   const [pageImages,  setPageImages]  = useState<string[]>([])
-  const [currentPage, setCurrentPage] = useState(initialSpread * 2 + 1)
+  // Map editor's initialSpread to the re-ordered turn.js page number:
+  // spread 0 (Tapa/Contra) → page 1 (Tapa), spread s>0 → page s*2
+  const initialPage = initialSpread === 0 ? 1 : initialSpread * 2
+  const [currentPage, setCurrentPage] = useState(initialPage)
 
   const flipbookEl = useRef<HTMLDivElement>(null)
   const $bookRef   = useRef<any>(null)
@@ -107,11 +126,21 @@ export default function PreviewModal({
     setLoading(true)
 
     const tasks: Promise<string>[] = []
-    for (let s = 0; s < totalSpreads; s++) {
-      const data = spreadsData[s]
-      tasks.push(exportPageAsJpg(data?.left  ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
-      tasks.push(exportPageAsJpg(data?.right ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
+    // Book order: Tapa → inner spreads → Contra
+    // Inside (spread 1 left) and Outside (last spread right) are non-editable — rendered as gray placeholders
+    tasks.push(exportPageAsJpg(spreadsData[0]?.right ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1)) // Tapa
+    for (let s = 1; s < totalSpreads; s++) {
+      const data     = spreadsData[s]
+      const isInside  = s === 1
+      const isOutside = s === totalSpreads - 1
+      tasks.push(isInside
+        ? Promise.resolve(renderNoEditPage())
+        : exportPageAsJpg(data?.left ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
+      tasks.push(isOutside
+        ? Promise.resolve(renderNoEditPage())
+        : exportPageAsJpg(data?.right ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
     }
+    tasks.push(exportPageAsJpg(spreadsData[0]?.left ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))  // Contra
 
     Promise.all(tasks).then(images => {
       if (!cancelled) { setPageImages(images); setLoading(false) }
@@ -155,7 +184,7 @@ export default function PreviewModal({
         acceleration: true,
         elevation:    50,
         duration:     800,
-        page:         initialSpread * 2 + 1,
+        page:         initialPage,
       })
 
       $book.bind('turned', (_e: any, page: number) => {
@@ -213,11 +242,15 @@ export default function PreviewModal({
 
   const canvasW   = Math.round(PAGE_W * scale)
   const canvasH   = Math.round(PAGE_H * scale)
-  const spreadNum = Math.floor((currentPage - 1) / 2)
-  const pageL     = spreadNum * 2 + 1
-  const pageR     = spreadNum * 2 + 2
-  const isFirst   = currentPage <= 2
-  const isLast    = currentPage >= totalSpreads * 2 - 1
+  const isFirst = currentPage <= 1
+  const isLast  = currentPage >= totalSpreads * 2
+
+  const pageLabel = (() => {
+    if (currentPage <= 1)                  return 'Tapa'
+    if (currentPage >= totalSpreads * 2)   return 'Contra'
+    const spreadNum = Math.floor((currentPage - 1) / 2)
+    return `Página ${spreadNum * 2 + 1} — ${spreadNum * 2 + 2}`
+  })()
 
   return (
     <div className="preview-overlay">
@@ -270,7 +303,7 @@ export default function PreviewModal({
           >
             <ChevronLeft size={15} strokeWidth={1.5} />
           </button>
-          <span className="preview-page-label">Página {pageL} — {pageR}</span>
+          <span className="preview-page-label">{pageLabel}</span>
           <button
             className="preview-nav-btn"
             onClick={() => go(1)}

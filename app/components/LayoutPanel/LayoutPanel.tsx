@@ -14,9 +14,13 @@ interface LayoutPanelProps {
   onPhotoCountChange: (count: number) => void
   onLayoutSelect: (layout: Layout) => void
   onAddTexture?: (url: string) => void
+  onAddSticker?: (url: string) => void
 }
 
-const TEXTURES = Array.from({ length: 9 }, (_, i) => `/text${i + 1}.jpg`)
+const TEXTURES = Array.from({ length: 12 }, (_, i) => `/texturas/text${i + 1}.jpg`)
+const FONDOS = ['/fondos/fondo.jpg', ...Array.from({ length: 11 }, (_, i) => `/fondos/fondo${i + 2}.jpg`)]
+const STICKERS = Array.from({ length: 13 }, (_, i) => `/stickers/stickersPNG${i + 1}.png`)
+const GRAFICOS = Array.from({ length: 7 }, (_, i) => `/ilus/IlusZeika-${i + 14}.png`)
 
 type MainTab = 'layouts' | 'fondos' | 'deco'
 type FondosSubTab = 'texturas' | 'fondos'
@@ -51,6 +55,7 @@ export default function LayoutPanel({
   onPhotoCountChange,
   onLayoutSelect,
   onAddTexture,
+  onAddSticker,
 }: LayoutPanelProps) {
   const { t } = useLang()
   const [activeTab, setActiveTab] = useState<MainTab>('layouts')
@@ -158,7 +163,7 @@ export default function LayoutPanel({
                     onClick={() => onAddTexture?.(url)}
                     onKeyDown={(e) => e.key === 'Enter' && onAddTexture?.(url)}
                     onDragStart={(e) => {
-                      e.dataTransfer.setData('text/plain', url)
+                      e.dataTransfer.setData('application/zeika-texture', url)
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
                   >
@@ -167,7 +172,25 @@ export default function LayoutPanel({
                 ))}
               </div>
             ) : (
-              <p className="panel-empty">Próximamente</p>
+              <div className="texture-grid">
+                {FONDOS.map((url) => (
+                  <div
+                    key={url}
+                    className="texture-thumb"
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onAddTexture?.(url)}
+                    onKeyDown={(e) => e.key === 'Enter' && onAddTexture?.(url)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/zeika-texture', url)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                  >
+                    <img src={url} alt="" className="texture-img" draggable={false} />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </>
@@ -191,7 +214,47 @@ export default function LayoutPanel({
             </button>
           </div>
           <div className="panel-content-grid">
-            <p className="panel-empty">Próximamente</p>
+            {decoSubTab === 'stickers' ? (
+              <div className="texture-grid">
+                {STICKERS.map((url) => (
+                  <div
+                    key={url}
+                    className="texture-thumb"
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onAddSticker?.(url)}
+                    onKeyDown={(e) => e.key === 'Enter' && onAddSticker?.(url)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/zeika-sticker', url)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                  >
+                    <img src={url} alt="" className="texture-img" draggable={false} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="texture-grid">
+                {GRAFICOS.map((url) => (
+                  <div
+                    key={url}
+                    className="texture-thumb"
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onAddSticker?.(url)}
+                    onKeyDown={(e) => e.key === 'Enter' && onAddSticker?.(url)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/zeika-sticker', url)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                  >
+                    <img src={url} alt="" className="texture-img" draggable={false} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

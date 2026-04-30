@@ -24,7 +24,8 @@ import { BOOK_SIZE }                                      from '../config/bookSi
 import type { GridSettings, Guide }                        from '../components/Canvas/Canvas'
 import { applyLayout, addTextBox, addShape, serializePage,
          deserializePage, dropPhotoOnFrame, dropPhotoFree,
-         exportPageAsJpg, buildPageFromLayout }            from '../components/Canvas/fabricHelpers'
+         exportPageAsJpg, buildPageFromLayout,
+         dropTextureOnPage, dropStickerOnPage }             from '../components/Canvas/fabricHelpers'
 import type { PageData, PhotoAssignment, ShapeKind }       from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
@@ -718,7 +719,15 @@ export default function EditorPage() {
   const handleAddTexture = useCallback(async (url: string) => {
     const fc = getActiveFabric()
     if (!fc) return
-    await dropPhotoFree(fc, url, PAGE_W / 2, PAGE_H / 2)
+    await dropTextureOnPage(fc, url, PAGE_W, PAGE_H)
+    saveCurrentSpread()
+  }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Add sticker (small, centered) on active page ──────────────────────────
+  const handleAddSticker = useCallback(async (url: string) => {
+    const fc = getActiveFabric()
+    if (!fc) return
+    await dropStickerOnPage(fc, url, PAGE_W, PAGE_H)
     saveCurrentSpread()
   }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1010,6 +1019,7 @@ export default function EditorPage() {
           onPhotoCountChange={setSelectedPhotoCount}
           onLayoutSelect={handleLayoutSelect}
           onAddTexture={handleAddTexture}
+          onAddSticker={handleAddSticker}
         />
       </div>
     </div>

@@ -398,6 +398,88 @@ export async function replacePhotoInFrame(
   canvas.renderAll()
 }
 
+// ─── 4e. dropTextureOnPage ───────────────────────────────────────────────────
+// Places a texture as a selectable, moveable image cover-scaled to the page.
+
+export async function dropTextureOnPage(
+  canvas: fabric.Canvas,
+  url: string,
+  pageW: number,
+  pageH: number,
+): Promise<void> {
+  const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+
+  const naturalW = img.width  || img.getScaledWidth()
+  const naturalH = img.height || img.getScaledHeight()
+  const scale    = Math.max(pageW / naturalW, pageH / naturalH)
+
+  img.set({
+    originX:           'center',
+    originY:           'center',
+    left:              pageW / 2,
+    top:               pageH / 2,
+    scaleX:            scale,
+    scaleY:            scale,
+    selectable:        true,
+    evented:           true,
+    borderColor:       '#528ED6',
+    borderScaleFactor: 2,
+    lockUniScaling:    true,
+  })
+  img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false })
+
+  ;(img as unknown as fabric.FabricObject & { data: FreePhotoData }).data = {
+    type:    'freePhoto',
+    naturalW,
+    naturalH,
+  }
+
+  canvas.add(img)
+  canvas.setActiveObject(img)
+  canvas.renderAll()
+}
+
+// ─── 4f. dropStickerOnPage ───────────────────────────────────────────────────
+// Places a sticker at ~20% of page width, centered, selectable and moveable.
+
+export async function dropStickerOnPage(
+  canvas: fabric.Canvas,
+  url: string,
+  pageW: number,
+  pageH: number,
+): Promise<void> {
+  const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+
+  const naturalW = img.width  || img.getScaledWidth()
+  const naturalH = img.height || img.getScaledHeight()
+  const targetW  = pageW * 0.20
+  const scale    = targetW / naturalW
+
+  img.set({
+    originX:           'center',
+    originY:           'center',
+    left:              pageW / 2,
+    top:               pageH / 2,
+    scaleX:            scale,
+    scaleY:            scale,
+    selectable:        true,
+    evented:           true,
+    borderColor:       '#528ED6',
+    borderScaleFactor: 2,
+    lockUniScaling:    true,
+  })
+
+  ;(img as unknown as fabric.FabricObject & { data: FreePhotoData }).data = {
+    type:    'freePhoto',
+    naturalW,
+    naturalH,
+  }
+
+  canvas.add(img)
+  canvas.setActiveObject(img)
+  canvas.renderAll()
+}
+
 // ─── 4d. dropPhotoFree ───────────────────────────────────────────────────────
 // Adds a free-floating image at (x, y) — no frame required.
 // Fits within MAX×MAX while preserving aspect ratio.

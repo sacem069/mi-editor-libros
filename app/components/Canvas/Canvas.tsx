@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
 import { X, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignVerticalJustifyStart, AlignCenterHorizontal, AlignVerticalJustifyEnd, AlignVerticalSpaceAround, AlignHorizontalSpaceAround } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
-import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx, makeClipRect } from './fabricHelpers'
+import { dropPhotoOnFrame, dropPhotoFree, dropTextureOnPage, dropStickerOnPage, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx, makeClipRect } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
 import './Canvas.css'
 
@@ -1182,6 +1182,20 @@ export default function Canvas({
         }
         saveHistory(fc)
         syncMultiSel(fc, side)
+        const otherFc = side === 'left' ? rc : lc
+        if (e.target) syncSpreadMirror(e.target as unknown as fabric.FabricImage, fc, otherFc)
+      })
+      fc.on('object:removed', (e) => {
+        const removed = e.target as unknown as fabric.FabricImage
+        const mirror  = spreadMirrors.get(removed)
+        if (mirror && !isLoadingHistory.current) {
+          const otherFc = side === 'left' ? rc : lc
+          isLoadingHistory.current = true
+          otherFc.remove(mirror)
+          isLoadingHistory.current = false
+          spreadMirrors.delete(removed)
+          otherFc.renderAll()
+        }
       })
       fc.on('text:editing:entered', () => {
         const obj = fc.getActiveObject()
@@ -1311,6 +1325,10 @@ export default function Canvas({
             ? (cx2 > PAGE_W * 0.85 ? 'right' : null)
             : (cx2 < PAGE_W * 0.15 ? 'left'  : null),
         )
+
+        // Sync spread mirror for freePhotos overlapping the page boundary
+        const otherFc2 = side === 'left' ? rc : lc
+        syncSpreadMirror(e.target as unknown as fabric.FabricImage, fc, otherFc2)
       })
 
       // ── Scroll to zoom inside frame in edit mode ──────────────────────────
@@ -1394,6 +1412,15 @@ export default function Canvas({
         }
       }
 
+      // Remove any spread mirror the transferred object had on the destination canvas
+      const xferMirror = spreadMirrors.get(obj as unknown as fabric.FabricImage)
+      if (xferMirror) {
+        isLoadingHistory.current = true
+        to.remove(xferMirror)
+        isLoadingHistory.current = false
+        spreadMirrors.delete(obj as unknown as fabric.FabricImage)
+      }
+
       from.remove(obj)
       from.discardActiveObject()
       from.renderAll()
@@ -1401,6 +1428,65 @@ export default function Canvas({
       to.add(cloned)
       to.setActiveObject(cloned)
       to.renderAll()
+    }
+
+    // ── Spread mirrors: freePhoto objects that visually span both pages ────────
+    // Maps master FabricImage → its ghost copy on the other canvas.
+    const spreadMirrors = new Map<fabric.FabricImage, fabric.FabricImage>()
+
+    function syncSpreadMirror(
+      master: fabric.FabricImage,
+      masterCanvas: fabric.Canvas,
+      otherCanvas:  fabric.Canvas,
+    ) {
+      const data = (master as unknown as { data?: { type: string } }).data
+      if (data?.type !== 'freePhoto') return
+
+      const hw = master.getScaledWidth()  / 2
+      const cx = master.left ?? 0
+      const overlaps = masterCanvas === lc ? (cx + hw) > PAGE_W : (cx - hw) < 0
+      const offsetX  = masterCanvas === lc ? -CANVAS_GAP : CANVAS_GAP
+
+      let mirror = spreadMirrors.get(master)
+
+      if (!overlaps) {
+        if (mirror) {
+          isLoadingHistory.current = true
+          otherCanvas.remove(mirror)
+          isLoadingHistory.current = false
+          spreadMirrors.delete(master)
+          otherCanvas.renderAll()
+        }
+        return
+      }
+
+      const ml = cx + offsetX
+      const mt = master.top ?? 0
+
+      if (mirror) {
+        mirror.set({ left: ml, top: mt, scaleX: master.scaleX, scaleY: master.scaleY, angle: master.angle ?? 0 })
+        mirror.setCoords()
+        otherCanvas.renderAll()
+      } else {
+        const src = master.getSrc()
+        fabric.FabricImage.fromURL(src, { crossOrigin: 'anonymous' }).then((img) => {
+          if (!masterCanvas.getObjects().includes(master as unknown as fabric.FabricObject)) return
+          img.set({
+            originX: 'center', originY: 'center',
+            left: ml, top: mt,
+            scaleX: master.scaleX ?? 1, scaleY: master.scaleY ?? 1,
+            angle: master.angle ?? 0,
+            selectable: false, evented: false,
+          })
+          ;(img as unknown as { data: { type: string } }).data = { type: 'spreadMirror' }
+          spreadMirrors.set(master, img)
+          isLoadingHistory.current = true
+          otherCanvas.add(img)
+          isLoadingHistory.current = false
+          otherCanvas.sendObjectToBack(img)
+          otherCanvas.renderAll()
+        })
+      }
     }
 
     lc.on('object:modified', async (e) => {
@@ -1629,6 +1715,20 @@ export default function Canvas({
       const layoutId = e.dataTransfer.getData('application/zeika-layout')
       if (layoutId) {
         onLayoutDropOnPageRef.current(layoutId, page)
+        return
+      }
+
+      const textureUrl = e.dataTransfer.getData('application/zeika-texture')
+      if (textureUrl) {
+        const fc = page === 'left' ? leftFabric.current : rightFabric.current
+        if (fc) await dropTextureOnPage(fc, textureUrl, PAGE_W, PAGE_H)
+        return
+      }
+
+      const stickerUrl = e.dataTransfer.getData('application/zeika-sticker')
+      if (stickerUrl) {
+        const fc = page === 'left' ? leftFabric.current : rightFabric.current
+        if (fc) await dropStickerOnPage(fc, stickerUrl, PAGE_W, PAGE_H)
         return
       }
 
