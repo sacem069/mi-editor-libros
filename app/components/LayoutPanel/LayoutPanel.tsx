@@ -13,7 +13,7 @@ interface LayoutPanelProps {
   selectedLayoutId: string | null
   onPhotoCountChange: (count: number) => void
   onLayoutSelect: (layout: Layout) => void
-  onApplyTexture?: (url: string) => void
+  onAddTexture?: (url: string) => void
 }
 
 const TEXTURES = Array.from({ length: 9 }, (_, i) => `/text${i + 1}.jpg`)
@@ -50,7 +50,7 @@ export default function LayoutPanel({
   selectedLayoutId,
   onPhotoCountChange,
   onLayoutSelect,
-  onApplyTexture,
+  onAddTexture,
 }: LayoutPanelProps) {
   const { t } = useLang()
   const [activeTab, setActiveTab] = useState<MainTab>('layouts')
@@ -149,14 +149,21 @@ export default function LayoutPanel({
             {fondosSubTab === 'texturas' ? (
               <div className="texture-grid">
                 {TEXTURES.map((url) => (
-                  <button
+                  <div
                     key={url}
                     className="texture-thumb"
-                    onClick={() => onApplyTexture?.(url)}
-                    aria-label={url}
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onAddTexture?.(url)}
+                    onKeyDown={(e) => e.key === 'Enter' && onAddTexture?.(url)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', url)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
                   >
                     <img src={url} alt="" className="texture-img" draggable={false} />
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : (

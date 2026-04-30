@@ -18,10 +18,10 @@ type PhotoData = {
   frameY: number
   frameW: number
   frameH: number
-  naturalW: number  // intrinsic pixel width of the source image
-  naturalH: number  // intrinsic pixel height of the source image
-  imgLeft: number   // current center-X of image (updated as user pans in content mode)
-  imgTop: number    // current center-Y of image
+  naturalW: number   // intrinsic pixel width of the source image
+  naturalH: number   // intrinsic pixel height of the source image
+  coverScale: number // Math.max(frameW/naturalW, frameH/naturalH) — base cover scale
+  editScale: number  // zoom multiplier inside frame (≥ 1.0); combined with coverScale
 }
 
 type TextData = {
@@ -71,7 +71,7 @@ function isFreePhotoObj(obj: fabric.FabricObject): obj is FabricObjectWithData {
 // Build an absolutePositioned clipPath rect from frame coords.
 // absolutePositioned:true means Fabric clips in canvas coordinates,
 // so the clip region stays fixed even as the image's left/top changes.
-function makeClipRect(frameX: number, frameY: number, frameW: number, frameH: number): fabric.Rect {
+export function makeClipRect(frameX: number, frameY: number, frameW: number, frameH: number): fabric.Rect {
   return new fabric.Rect({
     originX: 'left',
     originY: 'top',
@@ -239,30 +239,36 @@ export async function dropPhotoOnFrame(
   const naturalW = img.width  || img.getScaledWidth()
   const naturalH = img.height || img.getScaledHeight()
 
-  // Step 4: object-fit: cover scale so the shorter axis fills the frame
-  const scale = Math.max(frameW / naturalW, frameH / naturalH)
+  // Step 4: cover scale — image fills the frame on both axes, overflow is clipped
+  const coverScale = Math.max(frameW / naturalW, frameH / naturalH)
 
-  // Step 5: virtual dimensions — rendered size = virt * scale = frame size.
-  // Handles sit at frame corners; no cropX/cropY needed.
-  const virtW = frameW / scale
-  const virtH = frameH / scale
+  // Step 5: virtual window dims — how many source pixels fit in the frame at coverScale.
+  // Handles sit at frame corners. cropX/cropY pan the image within this window.
+  const virtW = frameW / coverScale
+  const virtH = frameH / coverScale
+
+  // Center crop: show the middle portion of the source image
+  const cropX = (naturalW - virtW) / 2
+  const cropY = (naturalH - virtH) / 2
 
   img.set({
     originX: 'center',
     originY: 'center',
     left:    frameX + frameW / 2,
     top:     frameY + frameH / 2,
-    scaleX:  scale,
-    scaleY:  scale,
+    scaleX:  coverScale,
+    scaleY:  coverScale,
     width:   virtW,
     height:  virtH,
+    cropX,
+    cropY,
     selectable:        true,
     evented:           true,
     borderColor:       '#528ED6',
     borderScaleFactor: 2,
   })
 
-  // Step 6: clip to frame region (absolutePositioned → stays fixed as image moves)
+  // Step 6: clip to frame region (absolutePositioned → stays fixed as image pans)
   img.clipPath = makeClipRect(frameX, frameY, frameW, frameH)
 
   // All 8 resize handles + rotate
@@ -276,8 +282,8 @@ export async function dropPhotoOnFrame(
     frameH,
     naturalW,
     naturalH,
-    imgLeft: frameX + frameW / 2,
-    imgTop:  frameY + frameH / 2,
+    coverScale,
+    editScale: 1,
   }
 
   // Remove frame AFTER coordinates captured, then add image
@@ -346,21 +352,25 @@ export async function replacePhotoInFrame(
 
   const img = await fabric.FabricImage.fromURL(newPhotoSrc, { crossOrigin: 'anonymous' })
 
-  const naturalW = img.width  || img.getScaledWidth()
-  const naturalH = img.height || img.getScaledHeight()
-  const scale    = Math.max(frameW / naturalW, frameH / naturalH)
-  const virtW    = frameW / scale
-  const virtH    = frameH / scale
+  const naturalW   = img.width  || img.getScaledWidth()
+  const naturalH   = img.height || img.getScaledHeight()
+  const coverScale = Math.max(frameW / naturalW, frameH / naturalH)
+  const virtW      = frameW / coverScale
+  const virtH      = frameH / coverScale
+  const cropX      = (naturalW - virtW) / 2
+  const cropY      = (naturalH - virtH) / 2
 
   img.set({
     originX:           'center',
     originY:           'center',
     left:              frameX + frameW / 2,
     top:               frameY + frameH / 2,
-    scaleX:            scale,
-    scaleY:            scale,
+    scaleX:            coverScale,
+    scaleY:            coverScale,
     width:             virtW,
     height:            virtH,
+    cropX,
+    cropY,
     selectable:        true,
     evented:           true,
     borderColor:       '#528ED6',
@@ -378,8 +388,8 @@ export async function replacePhotoInFrame(
     frameH,
     naturalW,
     naturalH,
-    imgLeft: frameX + frameW / 2,
-    imgTop:  frameY + frameH / 2,
+    coverScale,
+    editScale: 1,
   }
 
   canvas.remove(existingPhoto)
@@ -518,12 +528,17 @@ type SerializedFrame = {
   frameH: number
   isEmpty: boolean
   photo?: string
+  coverScale?: number
+  editScale?: number
+  cropX?: number
+  cropY?: number
+  naturalW?: number
+  naturalH?: number
+  // legacy fields (backward compat — ignored on load, center crop used instead)
   scaleX?: number
   scaleY?: number
   imgLeft?: number
   imgTop?: number
-  naturalW?: number
-  naturalH?: number
 }
 
 type SerializedText = {
@@ -599,18 +614,18 @@ export function serializePage(
     if (data?.type === 'photo' && obj instanceof fabric.FabricImage) {
       const pd = data as PhotoData
       frames.push({
-        frameX:   pd.frameX,
-        frameY:   pd.frameY,
-        frameW:   pd.frameW,
-        frameH:   pd.frameH,
-        isEmpty:  false,
-        photo:    obj.getSrc(),
-        scaleX:   obj.scaleX,
-        scaleY:   obj.scaleY,
-        imgLeft:  obj.left,
-        imgTop:   obj.top,
-        naturalW: pd.naturalW,
-        naturalH: pd.naturalH,
+        frameX:     pd.frameX,
+        frameY:     pd.frameY,
+        frameW:     pd.frameW,
+        frameH:     pd.frameH,
+        isEmpty:    false,
+        photo:      obj.getSrc(),
+        coverScale: pd.coverScale,
+        editScale:  pd.editScale,
+        cropX:      obj.cropX ?? 0,
+        cropY:      obj.cropY ?? 0,
+        naturalW:   pd.naturalW,
+        naturalH:   pd.naturalH,
       })
     }
 
@@ -719,23 +734,25 @@ export function buildPageFromLayout(
     const photo = photos[i]
     if (!photo) return { frameX, frameY, frameW, frameH, isEmpty: true as const }
 
-    const nW    = photo.naturalW || 1
-    const nH    = photo.naturalH || 1
-    const scale = Math.max(frameW / nW, frameH / nH)
+    const nW         = photo.naturalW || 1
+    const nH         = photo.naturalH || 1
+    const coverScale = Math.max(frameW / nW, frameH / nH)
+    const virtW      = frameW / coverScale
+    const virtH      = frameH / coverScale
 
     return {
       frameX,
       frameY,
       frameW,
       frameH,
-      isEmpty: false as const,
-      photo:   photo.src,
-      scaleX:  scale,
-      scaleY:  scale,
-      imgLeft: frameX + frameW / 2,
-      imgTop:  frameY + frameH / 2,
-      naturalW: nW,
-      naturalH: nH,
+      isEmpty:    false as const,
+      photo:      photo.src,
+      coverScale,
+      editScale:  1,
+      cropX:      (nW - virtW) / 2,
+      cropY:      (nH - virtH) / 2,
+      naturalW:   nW,
+      naturalH:   nH,
     }
   })
 
@@ -813,25 +830,30 @@ export async function deserializePage(
       }
       canvas.add(rect)
     } else if (sf.photo) {
-      const img = await fabric.FabricImage.fromURL(sf.photo, {
-        crossOrigin: 'anonymous',
-      })
+      const img = await fabric.FabricImage.fromURL(sf.photo, { crossOrigin: 'anonymous' })
 
-      const scale    = sf.scaleX ?? 1
-      const naturalW = sf.naturalW ?? (img.width  || img.getScaledWidth())
-      const naturalH = sf.naturalH ?? (img.height || img.getScaledHeight())
-      const virtW    = sf.frameW / scale
-      const virtH    = sf.frameH / scale
+      const naturalW   = sf.naturalW ?? (img.width  || img.getScaledWidth())
+      const naturalH   = sf.naturalH ?? (img.height || img.getScaledHeight())
+      const coverScale = sf.coverScale ?? Math.max(sf.frameW / naturalW, sf.frameH / naturalH)
+      const editScale  = sf.editScale  ?? 1
+      const scaleXY    = coverScale * editScale
+      const virtW      = sf.frameW / scaleXY
+      const virtH      = sf.frameH / scaleXY
+      // Use saved cropX/Y; fall back to center crop for old serialized data
+      const cropX      = sf.cropX ?? (naturalW - virtW) / 2
+      const cropY      = sf.cropY ?? (naturalH - virtH) / 2
 
       img.set({
         originX:           'center',
         originY:           'center',
-        left:              sf.imgLeft ?? sf.frameX + sf.frameW / 2,
-        top:               sf.imgTop  ?? sf.frameY + sf.frameH / 2,
-        scaleX:            scale,
-        scaleY:            sf.scaleY ?? scale,
+        left:              sf.frameX + sf.frameW / 2,
+        top:               sf.frameY + sf.frameH / 2,
+        scaleX:            scaleXY,
+        scaleY:            scaleXY,
         width:             virtW,
         height:            virtH,
+        cropX,
+        cropY,
         selectable:        true,
         evented:           true,
         borderColor:       '#528ED6',
@@ -849,8 +871,8 @@ export async function deserializePage(
         frameH:  sf.frameH,
         naturalW,
         naturalH,
-        imgLeft: sf.imgLeft ?? sf.frameX + sf.frameW / 2,
-        imgTop:  sf.imgTop  ?? sf.frameY + sf.frameH / 2,
+        coverScale,
+        editScale,
       }
       canvas.add(img)
     }

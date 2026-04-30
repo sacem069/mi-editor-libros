@@ -227,24 +227,30 @@
 
 .texture-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  padding: 2px;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 4px 2px 2px;
 }
 
 .texture-thumb {
-  background: none;
-  border: 1px solid #d0d0d0;
+  background: #eee;
+  border: none;
   border-radius: 2px;
   padding: 0;
-  cursor: pointer;
+  cursor: grab;
   overflow: hidden;
   aspect-ratio: 1;
-  transition: border-color 0.12s;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  transition: outline-color 0.12s;
 }
 
 .texture-thumb:hover {
-  border-color: var(--color-blue);
+  outline-color: var(--color-blue);
+}
+
+.texture-thumb:active {
+  cursor: grabbing;
 }
 
 .texture-img {
@@ -252,4 +258,5 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  user-select: none;
 }

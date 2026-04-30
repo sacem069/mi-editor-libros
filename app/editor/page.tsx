@@ -23,9 +23,8 @@ import type { Layout } from '../components/LayoutPanel/LayoutPanel'
 import { BOOK_SIZE }                                      from '../config/bookSize'
 import type { GridSettings, Guide }                        from '../components/Canvas/Canvas'
 import { applyLayout, addTextBox, addShape, serializePage,
-         deserializePage, dropPhotoOnFrame,
-         exportPageAsJpg, buildPageFromLayout,
-         setBackgroundTexture }                            from '../components/Canvas/fabricHelpers'
+         deserializePage, dropPhotoOnFrame, dropPhotoFree,
+         exportPageAsJpg, buildPageFromLayout }            from '../components/Canvas/fabricHelpers'
 import type { PageData, PhotoAssignment, ShapeKind }       from '../components/Canvas/fabricHelpers'
 import { LAYOUTS }                                         from '../config/layouts'
 
@@ -715,11 +714,11 @@ export default function EditorPage() {
   }, [])
   const handleFrameToolDeactivate = useCallback(() => setFrameTool(false), [])
 
-  // ── Texture background ────────────────────────────────────────────────────
-  const handleApplyTexture = useCallback(async (url: string) => {
+  // ── Add texture as free image on active page ──────────────────────────────
+  const handleAddTexture = useCallback(async (url: string) => {
     const fc = getActiveFabric()
     if (!fc) return
-    await setBackgroundTexture(fc, url, PAGE_W, PAGE_H)
+    await dropPhotoFree(fc, url, PAGE_W / 2, PAGE_H / 2)
     saveCurrentSpread()
   }, [saveCurrentSpread]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1010,7 +1009,7 @@ export default function EditorPage() {
           selectedLayoutId={selectedLayoutId}
           onPhotoCountChange={setSelectedPhotoCount}
           onLayoutSelect={handleLayoutSelect}
-          onApplyTexture={handleApplyTexture}
+          onAddTexture={handleAddTexture}
         />
       </div>
     </div>

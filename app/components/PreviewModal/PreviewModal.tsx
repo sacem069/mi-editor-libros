@@ -1,13 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import * as fabric from 'fabric'
 import {
   MessageSquare, Pencil,
   ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight,
 } from 'lucide-react'
-import { deserializePage } from '../Canvas/fabricHelpers'
+import { exportPageAsJpg } from '../Canvas/fabricHelpers'
 import type { PageData } from '../Canvas/fabricHelpers'
 import { BOOK_SIZE } from '../../config/bookSize'
 import './PreviewModal.css'
@@ -35,23 +34,45 @@ const EMPTY_PAGE: PageData = {
 const TITLEBAR_H = 50
 const CONTROLS_H = 64
 
+// ── Module-level turn.js loader (runs once per browser session) ──────────────
+let _turnLoaded = false
+const _turnQueue: Array<() => void> = []
+
+function ensureTurnJs(cb: () => void) {
+  if ((window as any).jQuery?.fn?.turn) { cb(); return }
+  _turnQueue.push(cb)
+  if (_turnLoaded) return
+  _turnLoaded = true
+  import('jquery').then(jq => {
+    const $ = jq.default as any
+    ;(window as any).jQuery = $
+    ;(window as any).$ = $
+    const script = document.createElement('script')
+    script.src = '/js/turn.min.js'
+    script.onload = () => {
+      const pending = _turnQueue.splice(0)
+      pending.forEach(fn => fn())
+    }
+    document.head.appendChild(script)
+  })
+}
+
 export default function PreviewModal({
   spreadsData,
   totalSpreads,
   initialSpread,
   onClose,
 }: Props) {
-  const [spread,      setSpread]      = useState(initialSpread)
   const [scale,       setScale]       = useState(0.5)
-  const [canvasReady, setCanvasReady] = useState(false)
-  const [loading,     setLoading]     = useState(false)
+  const [loading,     setLoading]     = useState(true)
+  const [pageImages,  setPageImages]  = useState<string[]>([])
+  const [currentPage, setCurrentPage] = useState(initialSpread * 2 + 1)
 
-  const leftEl  = useRef<HTMLCanvasElement>(null)
-  const rightEl = useRef<HTMLCanvasElement>(null)
-  const leftFc  = useRef<fabric.Canvas | null>(null)
-  const rightFc = useRef<fabric.Canvas | null>(null)
+  const flipbookEl = useRef<HTMLDivElement>(null)
+  const $bookRef   = useRef<any>(null)
+  const scaleRef   = useRef(scale)
 
-  // ── Scale ─────────────────────────────────────────────────────────────────
+  // ── Scale ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const compute = () => {
       const maxH = Math.min(
@@ -59,7 +80,7 @@ export default function PreviewModal({
         window.innerHeight - TITLEBAR_H - CONTROLS_H - 32,
       )
       const maxW = window.innerWidth * 0.78
-      const s    = Math.min(maxH / PAGE_H, maxW / (PAGE_W * 2))
+      const s = Math.min(maxH / PAGE_H, maxW / (PAGE_W * 2))
       setScale(Math.max(s, 0.15))
     }
     compute()
@@ -67,60 +88,106 @@ export default function PreviewModal({
     return () => window.removeEventListener('resize', compute)
   }, [])
 
-  // ── Init Fabric canvases once — never remounted ────────────────────────────
-  useEffect(() => {
-    if (!leftEl.current || !rightEl.current) return
-    leftFc.current  = new fabric.Canvas(leftEl.current,  { selection: false, renderOnAddRemove: false })
-    rightFc.current = new fabric.Canvas(rightEl.current, { selection: false, renderOnAddRemove: false })
-    setCanvasReady(true)
-    return () => {
-      leftFc.current?.dispose()
-      rightFc.current?.dispose()
-      leftFc.current  = null
-      rightFc.current = null
-    }
-  }, [])
+  useEffect(() => { scaleRef.current = scale }, [scale])
 
-  // ── Load spread whenever it changes ───────────────────────────────────────
+  // Resize turn.js book when scale changes
   useEffect(() => {
-    if (!canvasReady) return
-    const lc = leftFc.current
-    const rc = rightFc.current
-    if (!lc || !rc) return
+    if (!$bookRef.current) return
+    try {
+      $bookRef.current.turn('size',
+        Math.round(PAGE_W * scale) * 2,
+        Math.round(PAGE_H * scale),
+      )
+    } catch {}
+  }, [scale])
 
+  // ── Pre-render all pages to JPEG data URLs ────────────────────────────────
+  useEffect(() => {
     let cancelled = false
     setLoading(true)
 
-    const data  = spreadsData[spread]
-    const lData = data?.left  ?? EMPTY_PAGE
-    const rData = data?.right ?? EMPTY_PAGE
+    const tasks: Promise<string>[] = []
+    for (let s = 0; s < totalSpreads; s++) {
+      const data = spreadsData[s]
+      tasks.push(exportPageAsJpg(data?.left  ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
+      tasks.push(exportPageAsJpg(data?.right ?? EMPTY_PAGE, PAGE_W, PAGE_H, 1))
+    }
 
-    const timer = setTimeout(() => {
-      if (cancelled) return
-      Promise.all([
-        deserializePage(lc, lData, PAGE_W, PAGE_H),
-        deserializePage(rc, rData, PAGE_W, PAGE_H),
-      ]).then(() => {
-        if (cancelled) return
-        for (const fc of [lc, rc]) {
-          fc.getObjects().forEach((o) =>
-            o.set({ selectable: false, evented: false, hoverCursor: 'default' }),
-          )
-          fc.renderAll()
-        }
-        if (!cancelled) setLoading(false)
-      }).catch(() => { if (!cancelled) setLoading(false) })
-    }, 100)
+    Promise.all(tasks).then(images => {
+      if (!cancelled) { setPageImages(images); setLoading(false) }
+    })
 
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [spread, spreadsData, canvasReady])
+    return () => { cancelled = true }
+  }, [spreadsData, totalSpreads])
+
+  // ── Init turn.js once all images are ready ────────────────────────────────
+  useEffect(() => {
+    if (loading || pageImages.length === 0 || !flipbookEl.current) return
+
+    const el = flipbookEl.current
+    const s  = scaleRef.current
+    const w  = Math.round(PAGE_W * s)
+    const h  = Math.round(PAGE_H * s)
+
+    // Build page DOM manually so React never interferes with turn.js internals
+    el.innerHTML = ''
+    pageImages.forEach((src, i) => {
+      const page = document.createElement('div')
+      page.className = 'preview-flip-page'
+      const img = document.createElement('img')
+      img.src = src
+      img.alt = `Página ${i + 1}`
+      img.draggable = false
+      page.appendChild(img)
+      el.appendChild(page)
+    })
+
+    ensureTurnJs(() => {
+      const $ = (window as any).jQuery
+      if (!$?.fn?.turn || !flipbookEl.current) return
+
+      const $book = $(flipbookEl.current)
+      $book.turn({
+        width:        w * 2,
+        height:       h,
+        autoCenter:   true,
+        gradients:    true,
+        acceleration: true,
+        elevation:    50,
+        duration:     800,
+        page:         initialSpread * 2 + 1,
+      })
+
+      $book.bind('turned', (_e: any, page: number) => {
+        setCurrentPage(page)
+      })
+
+      $bookRef.current = $book
+    })
+
+    return () => {
+      if ($bookRef.current) {
+        try { $bookRef.current.turn('destroy') } catch {}
+        $bookRef.current = null
+      }
+      el.innerHTML = ''
+    }
+  }, [loading, pageImages, initialSpread])
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const go = useCallback((delta: number) => {
-    const newS = Math.max(0, Math.min(totalSpreads - 1, spread + delta))
-    if (newS === spread) return
-    setSpread(newS)
-  }, [spread, totalSpreads])
+    if (!$bookRef.current) return
+    if (delta > 0) $bookRef.current.turn('next')
+    else           $bookRef.current.turn('previous')
+  }, [])
+
+  const goFirst = useCallback(() => {
+    $bookRef.current?.turn('page', 1)
+  }, [])
+
+  const goLast = useCallback(() => {
+    $bookRef.current?.turn('page', totalSpreads * 2)
+  }, [totalSpreads])
 
   // ── Keyboard ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -133,11 +200,24 @@ export default function PreviewModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [go, onClose])
 
-  const canvasW = Math.round(PAGE_W * scale)
-  const canvasH = Math.round(PAGE_H * scale)
-  const spineW  = Math.round(canvasW * 0.11)
-  const pageL   = spread * 2 + 1
-  const pageR   = spread * 2 + 2
+  // ── Mouse wheel ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      if (e.deltaY > 0) go(1)
+      else if (e.deltaY < 0) go(-1)
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [go])
+
+  const canvasW   = Math.round(PAGE_W * scale)
+  const canvasH   = Math.round(PAGE_H * scale)
+  const spreadNum = Math.floor((currentPage - 1) / 2)
+  const pageL     = spreadNum * 2 + 1
+  const pageR     = spreadNum * 2 + 2
+  const isFirst   = currentPage <= 2
+  const isLast    = currentPage >= totalSpreads * 2 - 1
 
   return (
     <div className="preview-overlay">
@@ -159,28 +239,16 @@ export default function PreviewModal({
 
       {/* ── Stage ── */}
       <div className="preview-stage">
-        <div className="preview-spread" style={{ width: canvasW * 2 }}>
-
-          {/* Left page */}
-          <div className="preview-page-wrap" style={{ width: canvasW, height: canvasH }}>
-            <div className="preview-page-inner" style={{ transform: `scale(${scale})` }}>
-              <canvas ref={leftEl} width={PAGE_W} height={PAGE_H} />
-            </div>
+        {loading ? (
+          <div className="preview-render-loading">Preparando vista previa…</div>
+        ) : (
+          <div
+            className="preview-book-shell"
+            style={{ width: canvasW * 2, height: canvasH }}
+          >
+            <div ref={flipbookEl} className="preview-flipbook" />
           </div>
-
-          {/* Right page */}
-          <div className="preview-page-wrap" style={{ width: canvasW, height: canvasH }}>
-            <div className="preview-page-inner" style={{ transform: `scale(${scale})` }}>
-              <canvas ref={rightEl} width={PAGE_W} height={PAGE_H} />
-            </div>
-          </div>
-
-          {/* Spine binding shadow — absolute, centered on the seam */}
-          <div className="preview-spine" style={{ width: spineW, height: canvasH }} />
-
-        </div>
-
-        {loading && <div className="preview-loading" />}
+        )}
       </div>
 
       {/* ── Bottom controls ── */}
@@ -188,8 +256,8 @@ export default function PreviewModal({
         <div className="preview-nav">
           <button
             className="preview-nav-btn"
-            onClick={() => go(-totalSpreads)}
-            disabled={spread === 0}
+            onClick={goFirst}
+            disabled={isFirst}
             title="Primera página"
           >
             <ChevronsLeft size={15} strokeWidth={1.5} />
@@ -197,7 +265,7 @@ export default function PreviewModal({
           <button
             className="preview-nav-btn"
             onClick={() => go(-1)}
-            disabled={spread === 0}
+            disabled={isFirst}
             title="Anterior"
           >
             <ChevronLeft size={15} strokeWidth={1.5} />
@@ -206,15 +274,15 @@ export default function PreviewModal({
           <button
             className="preview-nav-btn"
             onClick={() => go(1)}
-            disabled={spread === totalSpreads - 1}
+            disabled={isLast}
             title="Siguiente"
           >
             <ChevronRight size={15} strokeWidth={1.5} />
           </button>
           <button
             className="preview-nav-btn"
-            onClick={() => go(totalSpreads)}
-            disabled={spread === totalSpreads - 1}
+            onClick={goLast}
+            disabled={isLast}
             title="Última página"
           >
             <ChevronsRight size={15} strokeWidth={1.5} />

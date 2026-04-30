@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import * as fabric from 'fabric'
 import { X, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignVerticalJustifyStart, AlignCenterHorizontal, AlignVerticalJustifyEnd, AlignVerticalSpaceAround, AlignHorizontalSpaceAround } from 'lucide-react'
 import { BOOK_SIZE } from '../../config/bookSize'
-import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx } from './fabricHelpers'
+import { dropPhotoOnFrame, dropPhotoFree, findFrameAtPoint, findPhotoAtPoint, replacePhotoInFrame, restoreEmptyFrame, createFrameAtPx, makeClipRect } from './fabricHelpers'
 import { useLang } from '../../context/LanguageContext'
 import './Canvas.css'
 
@@ -532,13 +532,17 @@ export default function Canvas({
   const suppressMultiSelRef = useRef(false)
 
   // ── Content-grabber (pan) state — refs avoid stale closure issues ────────
-  const isPanMode    = useRef(false)
-  const panTargetRef = useRef<fabric.FabricImage & { data: { imgLeft: number; imgTop: number } } | null>(null)
-  const panData      = useRef<{
-    img: fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
-    startPtr:  { x: number; y: number }
-    startLeft: number
-    startTop:  number
+  const isPanMode             = useRef(false)
+  const panTargetRef          = useRef<fabric.FabricImage | null>(null)
+  const lastClickRef          = useRef<{ target: fabric.FabricObject; time: number } | null>(null)
+  const panIndicatorRef       = useRef<fabric.Rect | null>(null)
+  const panIndicatorCanvasRef = useRef<fabric.Canvas | null>(null)
+  const panCloneRef           = useRef<fabric.FabricImage | null>(null)
+  const panData               = useRef<{
+    img:          fabric.FabricImage
+    startPtr:     { x: number; y: number }
+    startImgLeft: number
+    startImgTop:  number
   } | null>(null)
 
   // ── Frame draw tool state ─────────────────────────────────────────────────
@@ -820,6 +824,63 @@ export default function Canvas({
     leftFabric.current  = lc
     rightFabric.current = rc
 
+    // ── Image pan mode exit ───────────────────────────────────────────────
+    const exitImgPanMode = () => {
+      const c   = panIndicatorCanvasRef.current
+      const img = panTargetRef.current
+      if (img) {
+        const pd = (img as unknown as fabric.FabricObject & { data: {
+          frameX: number; frameY: number; frameW: number; frameH: number
+          naturalW: number; naturalH: number; coverScale: number; editScale: number
+        } }).data
+        const scaleXY  = pd.coverScale * (pd.editScale ?? 1)
+        const virtW    = pd.frameW / scaleXY
+        const virtH    = pd.frameH / scaleXY
+        // Convert img.left/top back to cropX/cropY for virtual-dims normal mode
+        const panX     = (img.left ?? pd.frameX + pd.frameW / 2) - (pd.frameX + pd.frameW / 2)
+        const panY     = (img.top  ?? pd.frameY + pd.frameH / 2) - (pd.frameY + pd.frameH / 2)
+        const rawCropX = (pd.naturalW - virtW) / 2 - panX / scaleXY
+        const rawCropY = (pd.naturalH - virtH) / 2 - panY / scaleXY
+        const cropX    = Math.max(0, Math.min(rawCropX, pd.naturalW - virtW))
+        const cropY    = Math.max(0, Math.min(rawCropY, pd.naturalH - virtH))
+        img.set({
+          width:          virtW,
+          height:         virtH,
+          scaleX:         scaleXY,
+          scaleY:         scaleXY,
+          cropX,
+          cropY,
+          left:           pd.frameX + pd.frameW / 2,
+          top:            pd.frameY + pd.frameH / 2,
+          opacity:        1,
+          selectable:     true,
+          evented:        true,
+          lockUniScaling: false,
+        })
+        img.clipPath = makeClipRect(pd.frameX, pd.frameY, pd.frameW, pd.frameH)
+        img.setCoords()
+      }
+      // Remove the full-opacity clone that showed the in-frame content
+      if (panCloneRef.current && panIndicatorCanvasRef.current) {
+        isLoadingHistory.current = true
+        panIndicatorCanvasRef.current.remove(panCloneRef.current)
+        isLoadingHistory.current = false
+        panCloneRef.current = null
+      }
+      isPanMode.current    = false
+      panData.current      = null
+      panTargetRef.current = null
+      setPanModeActive(false)
+      if (c) {
+        c.selection     = true
+        c.defaultCursor = 'default'
+        if (panIndicatorRef.current) c.remove(panIndicatorRef.current)
+        c.renderAll()
+      }
+      panIndicatorRef.current       = null
+      panIndicatorCanvasRef.current = null
+    }
+
     // ── Per-canvas history helpers ─────────────────────────────────────────
     const getHistRef = (fc: fabric.Canvas) => fc === lc ? lcHistoryRef : rcHistoryRef
 
@@ -899,6 +960,96 @@ export default function Canvas({
         onActivePageChangeRef.current(side)
         activeCanvas = fc
 
+        // ── Manual double-click detection (Fabric 7's mouse:dblclick is unreliable) ──
+        if (!isFrameToolRef.current && !isPanMode.current) {
+          const { target } = e
+          const now = Date.now()
+          const last = lastClickRef.current
+          if (target && last && last.target === target && now - last.time < 300) {
+            lastClickRef.current = null
+            const data = (target as unknown as fabric.FabricObject & { data?: { type: string } }).data
+            if (data?.type === 'photo') {
+              const img = target as fabric.FabricImage
+              const pd  = (img as unknown as fabric.FabricObject & { data: {
+                frameX: number; frameY: number; frameW: number; frameH: number
+                naturalW: number; naturalH: number; coverScale: number; editScale: number
+              } }).data
+
+              const scaleXY  = pd.coverScale * (pd.editScale ?? 1)
+              const virtW    = pd.frameW / scaleXY
+              const virtH    = pd.frameH / scaleXY
+              const cropX    = img.cropX ?? 0
+              const cropY    = img.cropY ?? 0
+              // Convert current cropX/cropY to natural-dims img.left/top so the same source region stays centered
+              const initLeft = pd.frameX + pd.frameW / 2 + (pd.naturalW / 2 - cropX - virtW / 2) * scaleXY
+              const initTop  = pd.frameY + pd.frameH / 2 + (pd.naturalH / 2 - cropY - virtH / 2) * scaleXY
+
+              isPanMode.current    = true
+              panTargetRef.current = img
+              panData.current      = null
+              fc.discardActiveObject()
+              fc.selection     = false
+              fc.defaultCursor = 'grab'
+
+              // Ghost: full image at low opacity, no clip — shows the image extent outside the frame
+              img.set({
+                width:          pd.naturalW,
+                height:         pd.naturalH,
+                scaleX:         scaleXY,
+                scaleY:         scaleXY,
+                cropX:          0,
+                cropY:          0,
+                left:           initLeft,
+                top:            initTop,
+                opacity:        0.4,
+                selectable:     true,
+                evented:        true,
+                lockUniScaling: true,
+              })
+              img.clipPath = undefined
+
+              // Clone: same image at full opacity, clipped to frame — shows sharp content inside frame
+              const cloneEl = img.getElement() as HTMLImageElement
+              const clone = new fabric.FabricImage(cloneEl, {
+                originX:        'center',
+                originY:        'center',
+                left:           initLeft,
+                top:            initTop,
+                scaleX:         scaleXY,
+                scaleY:         scaleXY,
+                width:          pd.naturalW,
+                height:         pd.naturalH,
+                cropX:          0,
+                cropY:          0,
+                opacity:        1,
+                selectable:     false,
+                evented:        false,
+              })
+              clone.clipPath = makeClipRect(pd.frameX, pd.frameY, pd.frameW, pd.frameH)
+              isLoadingHistory.current = true
+              fc.add(clone)
+              isLoadingHistory.current = false
+              panCloneRef.current = clone
+
+              if (panIndicatorRef.current) fc.remove(panIndicatorRef.current)
+              const indicator = new fabric.Rect({
+                left: pd.frameX, top: pd.frameY, width: pd.frameW, height: pd.frameH,
+                originX: 'left', originY: 'top',
+                fill: 'rgba(232, 130, 12, 0.06)', stroke: '#E8820C', strokeWidth: 2,
+                strokeUniform: true, selectable: false, evented: false,
+              })
+              fc.add(indicator)
+              panIndicatorRef.current       = indicator
+              panIndicatorCanvasRef.current = fc
+              fc.renderAll()
+              setPanModeActive(true)
+              return
+            }
+          }
+          if (target) lastClickRef.current = { target, time: now }
+          else lastClickRef.current = null
+        }
+
         // ── Frame draw tool ───────────────────────────────────────────────────
         if (isFrameToolRef.current) {
           const ptr     = toCanvasPoint(fc, e.e as MouseEvent)
@@ -915,26 +1066,18 @@ export default function Canvas({
           return
         }
 
-        if (isPanMode.current && panTargetRef.current) {
-          const img  = panTargetRef.current
-          const rect = fc.upperCanvasEl.getBoundingClientRect()
-          const x    = (e.e as MouseEvent).clientX - rect.left
-          const y    = (e.e as MouseEvent).clientY - rect.top
-          panData.current = {
-            img,
-            startPtr:  { x, y },
-            startLeft: img.left ?? 0,
-            startTop:  img.top  ?? 0,
+        if (isPanMode.current) {
+          // Different canvas from where the image lives → exit
+          if (panIndicatorCanvasRef.current !== fc) {
+            exitImgPanMode()
+            return
           }
-          fc.defaultCursor = 'grabbing'
-        } else if (isPanMode.current && !panTargetRef.current) {
-          // Clicked outside any pan target → exit
-          isPanMode.current    = false
-          panData.current      = null
-          panTargetRef.current = null
-          fc.selection         = true
-          fc.defaultCursor     = 'default'
-          setPanModeActive(false)
+          // Click on empty canvas or any object other than the pan target → exit
+          if (e.target !== (panTargetRef.current as unknown as fabric.FabricObject)) {
+            exitImgPanMode()
+            return
+          }
+          // Clicked on the pan target — Fabric handles drag and corner-scale natively
         }
       })
 
@@ -953,14 +1096,26 @@ export default function Canvas({
           return
         }
         if (isPanMode.current && panData.current) {
-          const rect = fc.upperCanvasEl.getBoundingClientRect()
-          const x    = (e.e as MouseEvent).clientX - rect.left
-          const y    = (e.e as MouseEvent).clientY - rect.top
-          const { img, startPtr, startLeft, startTop } = panData.current
-          img.set({
-            left: startLeft + (x - startPtr.x),
-            top:  startTop  + (y - startPtr.y),
-          })
+          const ptr = toCanvasPoint(fc, e.e as MouseEvent)
+          const { img, startPtr, startImgLeft, startImgTop } = panData.current
+          const pd = (img as unknown as fabric.FabricObject & { data: {
+            frameX: number; frameY: number; frameW: number; frameH: number
+            naturalW: number; naturalH: number; coverScale: number; editScale: number
+          } }).data
+          const scaleXY   = pd.coverScale * (pd.editScale ?? 1)
+          const renderedW = pd.naturalW * scaleXY
+          const renderedH = pd.naturalH * scaleXY
+          // Image must always fully cover the frame — clamp left/top accordingly
+          const minLeft   = pd.frameX + pd.frameW - renderedW / 2
+          const maxLeft   = pd.frameX + renderedW / 2
+          const minTop    = pd.frameY + pd.frameH - renderedH / 2
+          const maxTop    = pd.frameY + renderedH / 2
+          const dx        = ptr.x - startPtr.x
+          const dy        = ptr.y - startPtr.y
+          const newLeft   = Math.max(minLeft, Math.min(startImgLeft + dx, maxLeft))
+          const newTop    = Math.max(minTop,  Math.min(startImgTop  + dy, maxTop))
+          img.set({ left: newLeft, top: newTop })
+          img.setCoords()
           fc.renderAll()
         }
       })
@@ -985,8 +1140,6 @@ export default function Canvas({
           return
         }
         if (panData.current) {
-          panData.current.img.data.imgLeft = panData.current.img.left ?? 0
-          panData.current.img.data.imgTop  = panData.current.img.top  ?? 0
           panData.current  = null
           fc.defaultCursor = 'grab'
         }
@@ -1043,76 +1196,112 @@ export default function Canvas({
       })
       fc.on('text:editing:exited',  () => setTextEditing(false))
 
-      // ── Photo scaling: maintain cover-fit, update clipPath ────────────────
+      // ── Photo scaling ────────────────────────────────────────────────────────
       fc.on('object:scaling', (e) => {
         const obj = e.target as unknown as fabric.FabricImage & {
-          data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number }
+          data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number; coverScale: number; editScale: number }
           clipPath?: fabric.Rect
         }
         if (obj?.data?.type !== 'photo') return
+        const pd = obj.data!
 
-        const pd = obj.data
-        // New frame size = virtual_dim × new scale
+        // ── Edit mode: scale = zoom image inside fixed frame ──────────────────
+        if (isPanMode.current && (obj as unknown) === panTargetRef.current) {
+          const newScaleXY   = Math.max(pd.coverScale, obj.scaleX ?? pd.coverScale)
+          const newEditScale = newScaleXY / pd.coverScale
+          const renderedW    = pd.naturalW * newScaleXY
+          const renderedH    = pd.naturalH * newScaleXY
+          const minLeft      = pd.frameX + pd.frameW - renderedW / 2
+          const maxLeft      = pd.frameX + renderedW / 2
+          const minTop       = pd.frameY + pd.frameH - renderedH / 2
+          const maxTop       = pd.frameY + renderedH / 2
+          const newLeft      = Math.max(minLeft, Math.min(obj.left ?? 0, maxLeft))
+          const newTop       = Math.max(minTop,  Math.min(obj.top  ?? 0, maxTop))
+          obj.set({ scaleX: newScaleXY, scaleY: newScaleXY, left: newLeft, top: newTop })
+          if (panCloneRef.current) {
+            panCloneRef.current.set({ scaleX: newScaleXY, scaleY: newScaleXY, left: newLeft, top: newTop })
+            panCloneRef.current.setCoords()
+          }
+          pd.editScale = newEditScale
+          return
+        }
+
+        // ── Normal mode: resize frame, recompute cover crop ───────────────────
+        // invariant: width * scaleX = frameW (holds at any editScale)
         const newFrameW = (obj.width  ?? 0) * (obj.scaleX ?? 1)
         const newFrameH = (obj.height ?? 0) * (obj.scaleY ?? 1)
 
-        // Cover scale and new virtual dims
-        const newScale = Math.max(newFrameW / pd.naturalW, newFrameH / pd.naturalH)
-        const newVirtW = newFrameW / newScale
-        const newVirtH = newFrameH / newScale
+        const newCoverScale = Math.max(newFrameW / pd.naturalW, newFrameH / pd.naturalH)
+        const newVirtW      = newFrameW / newCoverScale
+        const newVirtH      = newFrameH / newCoverScale
+        const newCropX = (pd.naturalW - newVirtW) / 2
+        const newCropY = (pd.naturalH - newVirtH) / 2
 
         const cx = obj.left ?? 0
         const cy = obj.top  ?? 0
 
         obj.set({
-          scaleX: newScale,
-          scaleY: newScale,
+          scaleX: newCoverScale,
+          scaleY: newCoverScale,
           width:  newVirtW,
           height: newVirtH,
+          cropX:  newCropX,
+          cropY:  newCropY,
         })
 
         const newFrameX = cx - newFrameW / 2
         const newFrameY = cy - newFrameH / 2
 
-        // Update clipPath to match new frame dimensions
         if (obj.clipPath) {
-          obj.clipPath.set({
-            left:   newFrameX,
-            top:    newFrameY,
-            width:  newFrameW,
-            height: newFrameH,
-          })
+          obj.clipPath.set({ left: newFrameX, top: newFrameY, width: newFrameW, height: newFrameH })
         }
 
-        // Keep data in sync
-        pd.frameX = newFrameX
-        pd.frameY = newFrameY
-        pd.frameW = newFrameW
-        pd.frameH = newFrameH
+        pd.frameX     = newFrameX
+        pd.frameY     = newFrameY
+        pd.frameW     = newFrameW
+        pd.frameH     = newFrameH
+        pd.coverScale = newCoverScale
+        pd.editScale  = 1
       })
 
-      // ── Object moving: update clipPath and frameX/Y ───────────────────────
-      // Fires only in STATE 2 (selectable=true). In pan mode selectable=false
-      // so Fabric never generates drag transforms for the pan target.
+      // ── Object moving: clamp in edit mode, update clipPath in normal mode ───
       fc.on('object:moving', (e) => {
         const obj = e.target as unknown as fabric.FabricObject & {
-          data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number }
+          data?: { type: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number; coverScale: number; editScale: number }
           clipPath?: fabric.Rect
         }
 
+        // Edit mode: pan = drag image; clamp so it always covers the frame
+        if (isPanMode.current && (obj as unknown) === panTargetRef.current) {
+          const pd        = obj.data!
+          const scaleXY   = pd.coverScale * (pd.editScale ?? 1)
+          const renderedW = pd.naturalW * scaleXY
+          const renderedH = pd.naturalH * scaleXY
+          const minLeft   = pd.frameX + pd.frameW - renderedW / 2
+          const maxLeft   = pd.frameX + renderedW / 2
+          const minTop    = pd.frameY + pd.frameH - renderedH / 2
+          const maxTop    = pd.frameY + renderedH / 2
+          const newLeft   = Math.max(minLeft, Math.min(obj.left ?? 0, maxLeft))
+          const newTop    = Math.max(minTop,  Math.min(obj.top  ?? 0, maxTop))
+          obj.set({ left: newLeft, top: newTop })
+          if (panCloneRef.current) {
+            panCloneRef.current.set({ left: newLeft, top: newTop })
+            panCloneRef.current.setCoords()
+          }
+          return
+        }
+        if (isPanMode.current) return
+
         if (obj?.data?.type === 'photo') {
+          // img.left is always the frame center in the virtual-dims model
           const cx = obj.left ?? 0
           const cy = obj.top  ?? 0
-          const pd = obj.data
+          const pd = obj.data!
           const newFrameX = cx - pd.frameW / 2
           const newFrameY = cy - pd.frameH / 2
           pd.frameX = newFrameX
           pd.frameY = newFrameY
-
-          // Move clipPath with the frame
-          if (obj.clipPath) {
-            obj.clipPath.set({ left: newFrameX, top: newFrameY })
-          }
+          if (obj.clipPath) obj.clipPath.set({ left: newFrameX, top: newFrameY })
         }
 
         // Cross-canvas drag highlight
@@ -1124,21 +1313,41 @@ export default function Canvas({
         )
       })
 
-      // ── Double-click: photo → pan mode (textbox is handled via text:editing:entered)
-      fc.on('mouse:dblclick', (e) => {
-        const obj = fc.findTarget(e.e)
+      // ── Scroll to zoom inside frame in edit mode ──────────────────────────
+      fc.upperCanvasEl.addEventListener('wheel', (e: WheelEvent) => {
+        if (!isPanMode.current || panIndicatorCanvasRef.current !== fc) return
+        if (e.ctrlKey) return  // let viewport zoom handle ctrl+scroll
+        e.preventDefault()
+        e.stopPropagation()
 
-        if (obj && (obj as unknown as fabric.FabricObject & { data?: { type: string } }).data?.type === 'photo') {
-          isPanMode.current    = true   // FIRST — before any Fabric property changes
-          panTargetRef.current = obj as unknown as fabric.FabricImage & { data: { imgLeft: number; imgTop: number } }
-          panData.current      = null
-          fc.discardActiveObject()
-          fc.selection     = false
-          fc.defaultCursor = 'grab'
-          fc.renderAll()
-          setPanModeActive(true)
+        const img = panTargetRef.current
+        if (!img) return
+        const pd = (img as unknown as fabric.FabricObject & { data: {
+          frameX: number; frameY: number; frameW: number; frameH: number
+          naturalW: number; naturalH: number; coverScale: number; editScale: number
+        } }).data
+
+        const factor       = e.deltaY < 0 ? 1.1 : 0.9
+        const newEditScale = Math.max(1, (pd.editScale ?? 1) * factor)
+        const newScaleXY   = pd.coverScale * newEditScale
+        const renderedW    = pd.naturalW * newScaleXY
+        const renderedH    = pd.naturalH * newScaleXY
+        // Clamp current img position to the new rendered bounds
+        const minLeft   = pd.frameX + pd.frameW - renderedW / 2
+        const maxLeft   = pd.frameX + renderedW / 2
+        const minTop    = pd.frameY + pd.frameH - renderedH / 2
+        const maxTop    = pd.frameY + renderedH / 2
+        const newLeft   = Math.max(minLeft, Math.min(img.left ?? pd.frameX + pd.frameW / 2, maxLeft))
+        const newTop    = Math.max(minTop,  Math.min(img.top  ?? pd.frameY + pd.frameH / 2, maxTop))
+        img.set({ scaleX: newScaleXY, scaleY: newScaleXY, left: newLeft, top: newTop })
+        img.setCoords()
+        if (panCloneRef.current) {
+          panCloneRef.current.set({ scaleX: newScaleXY, scaleY: newScaleXY, left: newLeft, top: newTop })
+          panCloneRef.current.setCoords()
         }
-      })
+        pd.editScale = newEditScale
+        fc.renderAll()
+      }, { passive: false })
 
       // Save history when objects are added (e.g. photo dropped)
       fc.on('object:added', () => saveHistory(fc))
@@ -1211,12 +1420,19 @@ export default function Canvas({
 
     // Clipboard stores plain serialized data — avoids Fabric clone() quirks in v7
     type ClipboardEntry =
-      | { kind: 'photo'; src: string; left: number; top: number; scaleX: number; scaleY: number; width: number; height: number; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number }
+      | { kind: 'photo'; src: string; frameX: number; frameY: number; frameW: number; frameH: number; naturalW: number; naturalH: number; coverScale: number; editScale: number; cropX: number; cropY: number }
       | { kind: 'frame'; frameX: number; frameY: number; frameW: number; frameH: number }
       | { kind: 'text';  text: string; left: number; top: number; width: number; fontSize: number; fontFamily: string; fill: string }
     const clipboard = { current: null as ClipboardEntry | null }
 
     const handleKeyDown = async (e: KeyboardEvent) => {
+      // ── Escape: exit image edit mode ─────────────────────────────────────
+      if (e.key === 'Escape' && isPanMode.current) {
+        exitImgPanMode()
+        e.preventDefault()
+        return
+      }
+
       // ── Ctrl/Cmd + C: copy ───────────────────────────────────────────────
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         // Don't intercept while a textbox is being edited
@@ -1230,20 +1446,18 @@ export default function Canvas({
 
         if (d?.type === 'photo' && obj instanceof fabric.FabricImage) {
           clipboard.current = {
-            kind:     'photo',
-            src:      obj.getSrc(),
-            left:     obj.left   ?? 0,
-            top:      obj.top    ?? 0,
-            scaleX:   obj.scaleX ?? 1,
-            scaleY:   obj.scaleY ?? 1,
-            width:    obj.width  ?? 0,
-            height:   obj.height ?? 0,
-            frameX:   d.frameX   as number,
-            frameY:   d.frameY   as number,
-            frameW:   d.frameW   as number,
-            frameH:   d.frameH   as number,
-            naturalW: d.naturalW as number,
-            naturalH: d.naturalH as number,
+            kind:       'photo',
+            src:        obj.getSrc(),
+            frameX:     d.frameX     as number,
+            frameY:     d.frameY     as number,
+            frameW:     d.frameW     as number,
+            frameH:     d.frameH     as number,
+            naturalW:   d.naturalW   as number,
+            naturalH:   d.naturalH   as number,
+            coverScale: (d.coverScale as number) ?? (obj.scaleX ?? 1),
+            editScale:  (d.editScale  as number) ?? 1,
+            cropX:      obj.cropX ?? 0,
+            cropY:      obj.cropY ?? 0,
           }
         } else if (d?.type === 'frame' && obj instanceof fabric.Rect) {
           clipboard.current = {
@@ -1277,17 +1491,22 @@ export default function Canvas({
 
         if (cb.kind === 'photo') {
           const img = await fabric.FabricImage.fromURL(cb.src, { crossOrigin: 'anonymous' })
-          const fx = cb.frameX + OFF
-          const fy = cb.frameY + OFF
+          const fx       = cb.frameX + OFF
+          const fy       = cb.frameY + OFF
+          const scaleXY  = cb.coverScale * cb.editScale
+          const virtW    = cb.frameW / scaleXY
+          const virtH    = cb.frameH / scaleXY
           img.set({
             originX:           'center',
             originY:           'center',
-            left:              cb.left   + OFF,
-            top:               cb.top    + OFF,
-            scaleX:            cb.scaleX,
-            scaleY:            cb.scaleY,
-            width:             cb.width,
-            height:            cb.height,
+            left:              fx + cb.frameW / 2,
+            top:               fy + cb.frameH / 2,
+            scaleX:            scaleXY,
+            scaleY:            scaleXY,
+            width:             virtW,
+            height:            virtH,
+            cropX:             cb.cropX,
+            cropY:             cb.cropY,
             selectable:        true,
             evented:           true,
             borderColor:       '#528ED6',
@@ -1302,7 +1521,7 @@ export default function Canvas({
           ;(img as unknown as fabric.FabricObject & { data: Record<string, unknown> }).data = {
             type: 'photo', frameX: fx, frameY: fy, frameW: cb.frameW, frameH: cb.frameH,
             naturalW: cb.naturalW, naturalH: cb.naturalH,
-            imgLeft: cb.left + OFF, imgTop: cb.top + OFF,
+            coverScale: cb.coverScale, editScale: cb.editScale,
           }
           activeCanvas.add(img)
           activeCanvas.setActiveObject(img)
