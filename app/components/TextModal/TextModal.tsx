@@ -24,23 +24,27 @@ export const TEXT_FONTS = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TextOpts {
-  text:       string
-  fontFamily: string
-  bold:       boolean
-  underline:  boolean
-  textAlign:  string
-  fontSize:   number
-  fill:       string
+  text:        string
+  fontFamily:  string
+  bold:        boolean
+  underline:   boolean
+  textAlign:   string
+  fontSize:    number
+  fill:        string
+  lineHeight:  number
+  charSpacing: number
 }
 
 interface Props {
-  initialText:      string
-  initialFont:      string
-  initialBold:      boolean
-  initialUnderline: boolean
-  initialAlign:     string
-  initialSize:      number
-  initialColor:     string
+  initialText:         string
+  initialFont:         string
+  initialBold:         boolean
+  initialUnderline:    boolean
+  initialAlign:        string
+  initialSize:         number
+  initialColor:        string
+  initialLineHeight:   number
+  initialCharSpacing:  number
   onConfirm: (opts: TextOpts) => void
   onCancel:  () => void
 }
@@ -50,15 +54,18 @@ interface Props {
 export default function TextModal({
   initialText, initialFont, initialBold, initialUnderline,
   initialAlign, initialSize, initialColor,
+  initialLineHeight, initialCharSpacing,
   onConfirm, onCancel,
 }: Props) {
-  const [text,       setText]       = useState(initialText)
-  const [fontFamily, setFontFamily] = useState(initialFont || TEXT_FONTS[0].value)
-  const [bold,       setBold]       = useState(initialBold)
-  const [underline,  setUnderline]  = useState(initialUnderline)
-  const [textAlign,  setTextAlign]  = useState(initialAlign || 'left')
-  const [fontSize,   setFontSize]   = useState(initialSize  || 24)
-  const [fill,       setFill]       = useState(initialColor || '#191919')
+  const [text,        setText]        = useState(initialText)
+  const [fontFamily,  setFontFamily]  = useState(initialFont || TEXT_FONTS[0].value)
+  const [bold,        setBold]        = useState(initialBold)
+  const [underline,   setUnderline]   = useState(initialUnderline)
+  const [textAlign,   setTextAlign]   = useState(initialAlign || 'left')
+  const [fontSize,    setFontSize]    = useState(initialSize  || 24)
+  const [fill,        setFill]        = useState(initialColor || '#191919')
+  const [lineHeight,  setLineHeight]  = useState(initialLineHeight  ?? 1.16)
+  const [charSpacing, setCharSpacing] = useState(initialCharSpacing ?? 0)
 
   const [fontPickerOpen, setFontPickerOpen] = useState(false)
   const colorInputRef  = useRef<HTMLInputElement>(null)
@@ -87,6 +94,9 @@ export default function TextModal({
     { value: 'justify', Icon: AlignJustify, label: 'Justificado' },
   ] as const
 
+  const lhDisplay = lineHeight.toFixed(2)
+  const csDisplay = charSpacing
+
   return (
     <div className="tm-overlay" onClick={onCancel}>
       <div className="tm" onClick={(e) => e.stopPropagation()}>
@@ -101,7 +111,7 @@ export default function TextModal({
 
         <div className="tm-rule" />
 
-        {/* Toolbar */}
+        {/* Toolbar row 1 — font / B-U / alignment / size / color */}
         <div className="tm-toolbar">
 
           {/* Font picker */}
@@ -186,7 +196,7 @@ export default function TextModal({
           <div className="tm-sep" />
 
           {/* Color */}
-          <span className="tm-color-label">Seleccione color</span>
+          <span className="tm-color-label">Color</span>
           <button
             className="tm-color-swatch"
             style={{ background: fill }}
@@ -202,6 +212,49 @@ export default function TextModal({
             aria-hidden="true"
             tabIndex={-1}
           />
+        </div>
+
+        {/* Toolbar row 2 — line height / letter spacing */}
+        <div className="tm-toolbar tm-toolbar--row2">
+
+          {/* Line height */}
+          <span className="tm-detail-label">Interlineado</span>
+          <button
+            className="tm-fmt"
+            onClick={() => setLineHeight((v) => Math.max(0.8, parseFloat((v - 0.1).toFixed(2))))}
+            aria-label="Reducir interlineado"
+          >
+            <CircleMinus size={11} strokeWidth={1.5} />
+          </button>
+          <span className="tm-detail-value">{lhDisplay}</span>
+          <button
+            className="tm-fmt"
+            onClick={() => setLineHeight((v) => Math.min(3.0, parseFloat((v + 0.1).toFixed(2))))}
+            aria-label="Aumentar interlineado"
+          >
+            <CirclePlus size={11} strokeWidth={1.5} />
+          </button>
+
+          <div className="tm-sep" />
+
+          {/* Letter spacing */}
+          <span className="tm-detail-label">Espaciado</span>
+          <button
+            className="tm-fmt"
+            onClick={() => setCharSpacing((v) => Math.max(-200, v - 10))}
+            aria-label="Reducir espaciado"
+          >
+            <CircleMinus size={11} strokeWidth={1.5} />
+          </button>
+          <span className="tm-detail-value">{csDisplay}</span>
+          <button
+            className="tm-fmt"
+            onClick={() => setCharSpacing((v) => Math.min(500, v + 10))}
+            aria-label="Aumentar espaciado"
+          >
+            <CirclePlus size={11} strokeWidth={1.5} />
+          </button>
+
         </div>
 
         <div className="tm-rule" />
@@ -220,6 +273,8 @@ export default function TextModal({
             textAlign:      textAlign as React.CSSProperties['textAlign'],
             fontSize:       `${Math.min(Math.max(fontSize, 10), 36)}px`,
             color:          fill,
+            lineHeight:     lineHeight,
+            letterSpacing:  `${charSpacing / 1000}em`,
           }}
         />
 
@@ -228,7 +283,10 @@ export default function TextModal({
           <button className="tm-action" onClick={onCancel}>Cancelar</button>
           <button
             className="tm-action tm-action--ok"
-            onClick={() => onConfirm({ text, fontFamily, bold, underline, textAlign, fontSize, fill })}
+            onClick={() => onConfirm({
+              text, fontFamily, bold, underline, textAlign, fontSize, fill,
+              lineHeight, charSpacing,
+            })}
           >
             OK
           </button>

@@ -76,6 +76,13 @@
   flex-shrink: 0;
 }
 
+.tm-toolbar--row2 {
+  padding-top: 3px;
+  padding-bottom: 5px;
+  border-top: 1px solid #f0f0f0;
+  gap: 3px;
+}
+
 .tm-font-picker {
   position: relative;
   flex-shrink: 0;
@@ -185,6 +192,27 @@
   white-space: nowrap;
   letter-spacing: 0.02em;
   margin-left: 2px;
+}
+
+.tm-detail-label {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 500;
+  color: #888;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+
+.tm-detail-value {
+  font-family: var(--font-body);
+  font-size: 10px;
+  min-width: 30px;
+  text-align: center;
+  color: var(--color-black);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .tm-color-swatch {

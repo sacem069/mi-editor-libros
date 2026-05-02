@@ -954,6 +954,9 @@ export default function Canvas({
       return { x: (e.clientX - r.left) * (PAGE_W / r.width), y: (e.clientY - r.top) * (PAGE_H / r.height) }
     }
 
+    // Must be declared before bind() so event-handler closures can reference it.
+    const spreadMirrors = new Map<fabric.FabricImage, fabric.FabricImage>()
+
     const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
       fc.on('mouse:down', (e) => {
         setActivePage(side)
@@ -1431,9 +1434,6 @@ export default function Canvas({
     }
 
     // ── Spread mirrors: freePhoto objects that visually span both pages ────────
-    // Maps master FabricImage → its ghost copy on the other canvas.
-    const spreadMirrors = new Map<fabric.FabricImage, fabric.FabricImage>()
-
     function syncSpreadMirror(
       master: fabric.FabricImage,
       masterCanvas: fabric.Canvas,

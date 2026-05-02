@@ -420,13 +420,15 @@ export default function EditorPage() {
     if (!textModal) return
     const { textbox, side } = textModal
     textbox.set({
-      text:       opts.text,
-      fontFamily: opts.fontFamily,
-      fontWeight: opts.bold ? 'bold' : 'normal',
-      underline:  opts.underline,
-      textAlign:  opts.textAlign as fabric.Textbox['textAlign'],
-      fontSize:   opts.fontSize,
-      fill:       opts.fill,
+      text:        opts.text,
+      fontFamily:  opts.fontFamily,
+      fontWeight:  opts.bold ? 'bold' : 'normal',
+      underline:   opts.underline,
+      textAlign:   opts.textAlign as fabric.Textbox['textAlign'],
+      fontSize:    opts.fontSize,
+      fill:        opts.fill,
+      lineHeight:  opts.lineHeight,
+      charSpacing: opts.charSpacing,
     })
     const fc = side === 'left' ? fabricLeft.current : fabricRight.current
     fc?.renderAll()
@@ -1042,6 +1044,8 @@ export default function EditorPage() {
         initialAlign={textModal.textbox.textAlign ?? 'left'}
         initialSize={textModal.textbox.fontSize ?? 24}
         initialColor={(textModal.textbox.fill as string) ?? '#191919'}
+        initialLineHeight={textModal.textbox.lineHeight ?? 1.16}
+        initialCharSpacing={textModal.textbox.charSpacing ?? 0}
         onConfirm={handleTextConfirm}
         onCancel={handleTextCancel}
       />

@@ -624,13 +624,18 @@ type SerializedFrame = {
 }
 
 type SerializedText = {
-  text: string
-  left: number
-  top: number
-  width: number
-  fontSize: number
-  fontFamily: string
-  fill: string
+  text:        string
+  left:        number
+  top:         number
+  width:       number
+  fontSize:    number
+  fontFamily:  string
+  fill:        string
+  fontWeight?: string
+  underline?:  boolean
+  textAlign?:  string
+  lineHeight?:  number
+  charSpacing?: number
 }
 
 type SerializedFreePhoto = {
@@ -727,13 +732,18 @@ export function serializePage(
 
     if (data?.type === 'text' && obj instanceof fabric.Textbox) {
       texts.push({
-        text: obj.text ?? '',
-        left: obj.left ?? 0,
-        top: obj.top ?? 0,
-        width: obj.width ?? pageW * 0.5,
-        fontSize: obj.fontSize ?? 24,
-        fontFamily: obj.fontFamily ?? 'amandine',
-        fill: (obj.fill as string) ?? '#191919',
+        text:        obj.text ?? '',
+        left:        obj.left ?? 0,
+        top:         obj.top ?? 0,
+        width:       obj.width ?? pageW * 0.5,
+        fontSize:    obj.fontSize ?? 24,
+        fontFamily:  obj.fontFamily ?? 'amandine',
+        fill:        (obj.fill as string) ?? '#191919',
+        fontWeight:  (obj.fontWeight as string) ?? 'normal',
+        underline:   obj.underline ?? false,
+        textAlign:   obj.textAlign ?? 'left',
+        lineHeight:  obj.lineHeight ?? 1.16,
+        charSpacing: obj.charSpacing ?? 0,
       })
     }
 
@@ -987,12 +997,17 @@ export async function deserializePage(
 
   for (const st of pageData.texts) {
     const textbox = new fabric.Textbox(st.text, {
-      left: st.left,
-      top: st.top,
-      width: st.width,
-      fontFamily: st.fontFamily,
-      fontSize: st.fontSize,
-      fill: st.fill,
+      left:        st.left,
+      top:         st.top,
+      width:       st.width,
+      fontFamily:  st.fontFamily,
+      fontSize:    st.fontSize,
+      fill:        st.fill,
+      fontWeight:  st.fontWeight  ?? 'normal',
+      underline:   st.underline   ?? false,
+      textAlign:   (st.textAlign  ?? 'left') as fabric.Textbox['textAlign'],
+      lineHeight:  st.lineHeight  ?? 1.16,
+      charSpacing: st.charSpacing ?? 0,
     }) as fabric.Textbox & { data: TextData }
 
     textbox.data = { type: 'text' }
