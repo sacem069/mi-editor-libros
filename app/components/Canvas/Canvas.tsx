@@ -957,95 +957,111 @@ export default function Canvas({
     // Must be declared before bind() so event-handler closures can reference it.
     const spreadMirrors = new Map<fabric.FabricImage, fabric.FabricImage>()
 
+    const enterImgPanMode = (img: fabric.FabricImage, fc: fabric.Canvas) => {
+      if (isPanMode.current) return
+      const pd  = (img as unknown as fabric.FabricObject & { data: {
+        frameX: number; frameY: number; frameW: number; frameH: number
+        naturalW: number; naturalH: number; coverScale: number; editScale: number
+      } }).data
+
+      const scaleXY  = pd.coverScale * (pd.editScale ?? 1)
+      const virtW    = pd.frameW / scaleXY
+      const virtH    = pd.frameH / scaleXY
+      const cropX    = img.cropX ?? 0
+      const cropY    = img.cropY ?? 0
+      // Convert current cropX/cropY to natural-dims img.left/top so the same source region stays centered
+      const initLeft = pd.frameX + pd.frameW / 2 + (pd.naturalW / 2 - cropX - virtW / 2) * scaleXY
+      const initTop  = pd.frameY + pd.frameH / 2 + (pd.naturalH / 2 - cropY - virtH / 2) * scaleXY
+
+      isPanMode.current    = true
+      panTargetRef.current = img
+      panData.current      = null
+      fc.discardActiveObject()
+      fc.selection     = false
+      fc.defaultCursor = 'grab'
+
+      // Ghost: full image at low opacity, no clip — shows the image extent outside the frame
+      img.set({
+        width:          pd.naturalW,
+        height:         pd.naturalH,
+        scaleX:         scaleXY,
+        scaleY:         scaleXY,
+        cropX:          0,
+        cropY:          0,
+        left:           initLeft,
+        top:            initTop,
+        opacity:        0.4,
+        selectable:     true,
+        evented:        true,
+        lockUniScaling: true,
+      })
+      img.clipPath = undefined
+
+      // Clone: same image at full opacity, clipped to frame — shows sharp content inside frame
+      const cloneEl = img.getElement() as HTMLImageElement
+      const clone = new fabric.FabricImage(cloneEl, {
+        originX:        'center',
+        originY:        'center',
+        left:           initLeft,
+        top:            initTop,
+        scaleX:         scaleXY,
+        scaleY:         scaleXY,
+        width:          pd.naturalW,
+        height:         pd.naturalH,
+        cropX:          0,
+        cropY:          0,
+        opacity:        1,
+        selectable:     false,
+        evented:        false,
+      })
+      clone.clipPath = makeClipRect(pd.frameX, pd.frameY, pd.frameW, pd.frameH)
+      isLoadingHistory.current = true
+      fc.add(clone)
+      isLoadingHistory.current = false
+      panCloneRef.current = clone
+
+      if (panIndicatorRef.current) fc.remove(panIndicatorRef.current)
+      const indicator = new fabric.Rect({
+        left: pd.frameX, top: pd.frameY, width: pd.frameW, height: pd.frameH,
+        originX: 'left', originY: 'top',
+        fill: 'rgba(232, 130, 12, 0.06)', stroke: '#E8820C', strokeWidth: 2,
+        strokeUniform: true, selectable: false, evented: false,
+      })
+      fc.add(indicator)
+      panIndicatorRef.current       = indicator
+      panIndicatorCanvasRef.current = fc
+      fc.renderAll()
+      setPanModeActive(true)
+    }
+
     const bind = (fc: fabric.Canvas, side: 'left' | 'right') => {
+      // ── Primary double-click: Fabric's native event (most reliable in production) ──
+      fc.on('mouse:dblclick', (e) => {
+        if (isFrameToolRef.current || isPanMode.current) return
+        const { target } = e
+        if (!target) return
+        const data = (target as unknown as fabric.FabricObject & { data?: { type: string } }).data
+        if (data?.type === 'photo') {
+          lastClickRef.current = null
+          enterImgPanMode(target as fabric.FabricImage, fc)
+        }
+      })
+
       fc.on('mouse:down', (e) => {
         setActivePage(side)
         onActivePageChangeRef.current(side)
         activeCanvas = fc
 
-        // ── Manual double-click detection (Fabric 7's mouse:dblclick is unreliable) ──
+        // ── Fallback double-click detection (manual timing, guards against missed dblclick) ──
         if (!isFrameToolRef.current && !isPanMode.current) {
           const { target } = e
           const now = Date.now()
           const last = lastClickRef.current
-          if (target && last && last.target === target && now - last.time < 300) {
+          if (target && last && last.target === target && now - last.time < 400) {
             lastClickRef.current = null
             const data = (target as unknown as fabric.FabricObject & { data?: { type: string } }).data
             if (data?.type === 'photo') {
-              const img = target as fabric.FabricImage
-              const pd  = (img as unknown as fabric.FabricObject & { data: {
-                frameX: number; frameY: number; frameW: number; frameH: number
-                naturalW: number; naturalH: number; coverScale: number; editScale: number
-              } }).data
-
-              const scaleXY  = pd.coverScale * (pd.editScale ?? 1)
-              const virtW    = pd.frameW / scaleXY
-              const virtH    = pd.frameH / scaleXY
-              const cropX    = img.cropX ?? 0
-              const cropY    = img.cropY ?? 0
-              // Convert current cropX/cropY to natural-dims img.left/top so the same source region stays centered
-              const initLeft = pd.frameX + pd.frameW / 2 + (pd.naturalW / 2 - cropX - virtW / 2) * scaleXY
-              const initTop  = pd.frameY + pd.frameH / 2 + (pd.naturalH / 2 - cropY - virtH / 2) * scaleXY
-
-              isPanMode.current    = true
-              panTargetRef.current = img
-              panData.current      = null
-              fc.discardActiveObject()
-              fc.selection     = false
-              fc.defaultCursor = 'grab'
-
-              // Ghost: full image at low opacity, no clip — shows the image extent outside the frame
-              img.set({
-                width:          pd.naturalW,
-                height:         pd.naturalH,
-                scaleX:         scaleXY,
-                scaleY:         scaleXY,
-                cropX:          0,
-                cropY:          0,
-                left:           initLeft,
-                top:            initTop,
-                opacity:        0.4,
-                selectable:     true,
-                evented:        true,
-                lockUniScaling: true,
-              })
-              img.clipPath = undefined
-
-              // Clone: same image at full opacity, clipped to frame — shows sharp content inside frame
-              const cloneEl = img.getElement() as HTMLImageElement
-              const clone = new fabric.FabricImage(cloneEl, {
-                originX:        'center',
-                originY:        'center',
-                left:           initLeft,
-                top:            initTop,
-                scaleX:         scaleXY,
-                scaleY:         scaleXY,
-                width:          pd.naturalW,
-                height:         pd.naturalH,
-                cropX:          0,
-                cropY:          0,
-                opacity:        1,
-                selectable:     false,
-                evented:        false,
-              })
-              clone.clipPath = makeClipRect(pd.frameX, pd.frameY, pd.frameW, pd.frameH)
-              isLoadingHistory.current = true
-              fc.add(clone)
-              isLoadingHistory.current = false
-              panCloneRef.current = clone
-
-              if (panIndicatorRef.current) fc.remove(panIndicatorRef.current)
-              const indicator = new fabric.Rect({
-                left: pd.frameX, top: pd.frameY, width: pd.frameW, height: pd.frameH,
-                originX: 'left', originY: 'top',
-                fill: 'rgba(232, 130, 12, 0.06)', stroke: '#E8820C', strokeWidth: 2,
-                strokeUniform: true, selectable: false, evented: false,
-              })
-              fc.add(indicator)
-              panIndicatorRef.current       = indicator
-              panIndicatorCanvasRef.current = fc
-              fc.renderAll()
-              setPanModeActive(true)
+              enterImgPanMode(target as fabric.FabricImage, fc)
               return
             }
           }
